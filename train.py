@@ -74,7 +74,7 @@ if __name__ == "__main__":
     va_file_path = "/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va"
 
     parser.add_argument("--num_learners", type=int, default=2)
-    parser.add_argument("--num_gpus_per_learner", type=float, default=0.5)
+    parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
     
     args = parser.parse_args()
 
@@ -90,8 +90,6 @@ if __name__ == "__main__":
             },
         )
         .training(
-            # num_learners=args.num_learners,
-            # num_gpus_per_learner=args.num_gpus_per_learner,
             train_batch_size_per_learner=2000,
             lr=0.0004,
         )
@@ -110,3 +108,5 @@ if __name__ == "__main__":
     checkpoint_save_path = os.path.join(os.getcwd(), "checkpoints")
     checkpoint_dir = algo.save_to_path()
     print(f"saved algo to {checkpoint_dir}")
+    
+    algo.stop()
