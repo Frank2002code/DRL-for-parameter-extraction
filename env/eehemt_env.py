@@ -7,19 +7,17 @@ import verilogae  # Only available on Linux with python 3.11
 
 class EEHEMTEnv(gym.Env):
     """
-    一個客製化的 Gymnasium 環境，用於優化 EE-HEMT 模型參數
+    客製化的 Gymnasium 環境，用於優化 EE-HEMT 模型參數
 
     Attributes:
-        action_space (gym.spaces.Box): 定義了每個可調參數的允許變化範圍。
-        observation_space (gym.spaces.Box): 定義了狀態空間，包括參數值和 RMSPE。
+        action_space (gym.spaces.Box)
+        observation_space (gym.spaces.Box)
         ...
     """
     metadata = {'render_modes': []}
 
     def __init__(self, config):
         """
-        初始化環境。
-
         Args:
         """
         super(EEHEMTEnv, self).__init__()
@@ -32,7 +30,7 @@ class EEHEMTEnv(gym.Env):
         
         measured_data_for_bias = pd.read_csv(self.csv_file_path)
         vgs = measured_data_for_bias['vg'].values
-        vds = np.full_like(vgs, 1.5) # 假設 Vds 為 1.5V，請根據您的 csv 檔案調整
+        vds = np.full_like(vgs, 1.5)
         self.sweep_bias = {
             'br_gisi': vgs,
             'br_disi': vds,
@@ -40,7 +38,7 @@ class EEHEMTEnv(gym.Env):
             'br_esi': vgs
         }
 
-        # 1. 載入真實量測數據 I_meas
+        # 1. I_meas
         if not os.path.exists(self.csv_file_path):
             raise FileNotFoundError(f"Measured data file not found:: {self.csv_file_path}")
         measured_data = pd.read_csv(self.csv_file_path)
@@ -59,12 +57,9 @@ class EEHEMTEnv(gym.Env):
         high_bounds = np.append(param_maxs, np.inf).astype(np.float32)
         self.observation_space = spaces.Box(low=low_bounds, high=high_bounds, dtype=np.float32)
         
-        # ==================== 主要修改部分 START ====================
         # 4. 初始化內部狀態
-        # 根據新邏輯，直接從 Verilog-A 模型中獲取所有參數的預設值作為初始狀態
         self.initial_params = {name: param.default for name, param in self.eehemt_model.modelcard.items()}
         self.current_params = self.initial_params.copy()
-        # ===================== 主要修改部分 END =====================
 
         self.initial_rmspe = -1.0
         self.previous_rmspe = -1.0

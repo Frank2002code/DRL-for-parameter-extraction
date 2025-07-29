@@ -1,9 +1,7 @@
 from env.eehemt_env import EEHEMTEnv
 from ray.rllib.algorithms.ppo import PPOConfig
-# from ray import tune
 import argparse
-# import os
-# import pprint
+import os
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -75,9 +73,8 @@ if __name__ == "__main__":
     }
     va_file_path = "/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va"
 
-    parser.add_argument("--num_learners", type=int, default=4)
+    parser.add_argument("--num_learners", type=int, default=2)
     parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
-    parser.add_argument("--num-iterations", type=int, default=200)
     
     args = parser.parse_args()
 
@@ -105,15 +102,10 @@ if __name__ == "__main__":
     # Build the Algorithm.
     algo = config.build_algo()
 
-    # algo.train()
-    for i in range(args.num_iterations):
-        results = algo.train()
-        
-        print(f"--- Iteration: {i + 1}/{args.num_iterations} ---")
-        # pprint.pprint(results)
-    print("\nTraining completed.")
+    # print(algo.train())
+    algo.train()
     
-    # checkpoint_save_path = os.path.join(os.getcwd(), "checkpoints")
+    checkpoint_save_path = os.path.join(os.getcwd(), "checkpoints")
     checkpoint_dir = algo.save_to_path()
     print(f"saved algo to {checkpoint_dir}")
     
