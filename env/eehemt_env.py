@@ -93,7 +93,7 @@ class EEHEMTEnv(gym.Env):
         if test_modified:
             self.modified_initial_params = self.initial_params.copy()
             for name in self.tunable_param_names:
-                self.modified_initial_params[name] *= 1.5
+                self.modified_initial_params[name] *= 1.2
             self.current_params = self.modified_initial_params.copy()
         else:
             self.current_params = self.initial_params.copy()
@@ -117,7 +117,7 @@ class EEHEMTEnv(gym.Env):
             self.i_meas = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.modified_initial_params,
+                **self.initial_params,
             )
         else:
             # $ 原本用真正的 csv file 的 id 做 i_meas
@@ -275,10 +275,11 @@ class EEHEMTEnv(gym.Env):
                 self.current_params[param_name], min_val, max_val
             )
 
+        params_for_eval = {k: float(v) for k, v in self.current_params.items()}
         i_sim = self.eehemt_model.functions["Ids"].eval(
             temperature=self.temperature,
             voltages=self.sweep_bias,
-            **self.current_params,
+            **params_for_eval,
         )
 
         current_rmspe = self._calculate_rmspe(i_sim)
@@ -344,10 +345,11 @@ class EEHEMTEnv(gym.Env):
             )
 
         if plot_current:
+            params_for_eval = {k: float(v) for k, v in self.current_params.items()}
             i_sim_current = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.current_params,
+                **params_for_eval,
             )
             plt.plot(self.vgs, i_sim_current, "r-", label="Simulated (Current Params)")
 
