@@ -4,7 +4,7 @@ import argparse
 from ray.rllib.algorithms.ppo import PPOConfig
 
 from env.eehemt_env import EEHEMTEnv, tunable_params_config
-
+import torch as th
 # import os
 # import pprint
 
@@ -39,9 +39,16 @@ if __name__ == "__main__":
         type=str,
         default="/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
     )
-    parser.add_argument("--test_modified", type=bool, default=True) 
-    parser.add_argument("--num_learners", type=int, default=4)
-    parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
+    parser.add_argument("--test_modified", type=bool, default=True)
+    # parser.add_argument("--num_learners", type=int, default=4)
+    # parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
+    if th.cuda.device_count() == 4:
+        num_learners = 4
+        num_gpus_per_learner = 1.0
+    elif th.cuda.device_count == 2:
+        num_learners = 2
+        num_gpus_per_learner = 1.0
+
     parser.add_argument("--num-iterations", type=int, default=200)
 
     args = parser.parse_args()
@@ -63,8 +70,8 @@ if __name__ == "__main__":
             lr=0.0004,
         )
         .learners(
-            num_learners=args.num_learners,
-            num_gpus_per_learner=args.num_gpus_per_learner,
+            num_learners=num_learners,
+            num_gpus_per_learner=num_gpus_per_learner,
         )
     )
 

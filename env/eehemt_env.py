@@ -4,7 +4,8 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import verilogae  # Only available on Linux with python 3.11
+# Only available on Linux with python 3.11
+import verilogae  # type: ignore[import-untyped]
 from dotenv import load_dotenv
 from gymnasium import spaces
 
@@ -84,7 +85,7 @@ class EEHEMTEnv(gym.Env):
         # Initialize All Params
         self.tunable_params_config = config.get("tunable_params_config", {})
         self.tunable_param_names = list(self.tunable_params_config.keys())
-        
+
         self.initial_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
@@ -96,7 +97,6 @@ class EEHEMTEnv(gym.Env):
             self.current_params = self.modified_initial_params.copy()
         else:
             self.current_params = self.initial_params.copy()
-
 
         # Load measured data and set up sweep bias
         if not os.path.exists(self.csv_file_path):
@@ -112,7 +112,7 @@ class EEHEMTEnv(gym.Env):
             "br_t": self.vgs,
             "br_esi": self.vgs,
         }
-        
+
         if test_modified:
             self.i_meas = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
@@ -120,7 +120,7 @@ class EEHEMTEnv(gym.Env):
                 **self.modified_initial_params,
             )
         else:
-            #$ 原本用真正的 csv file 的 id 做 i_meas
+            # $ 原本用真正的 csv file 的 id 做 i_meas
             self.i_meas = measured_data["id"].values
 
         # Define Action Space
@@ -218,7 +218,7 @@ class EEHEMTEnv(gym.Env):
         """
         return {"current_rmspe": rmspe, "current_params": self.current_params}
 
-    def reset(self, seed: int = None, options: dict = None) -> tuple:
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple:
         """
         Resets the environment to its initial state for a new episode.
 
@@ -305,7 +305,7 @@ class EEHEMTEnv(gym.Env):
         plot_initial: bool = True,
         plot_modified: bool = True,
         plot_current: bool = True,
-        save_path: str = None,
+        save_path: str | None = None,
     ):
         """
         Plots and compares I-V curves for different parameter sets.
