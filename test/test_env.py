@@ -8,6 +8,7 @@ if __name__ == "__main__":
         "csv_file_path": "/home/u5977862/DRL-on-parameter-extraction/data/S25E02A025WS_25C_GMVG.csv",
         "tunable_params_config": tunable_params_config,
         "va_file_path": "/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
+        "test_modified": True,
     }
     env = EEHEMTEnv(
         config,

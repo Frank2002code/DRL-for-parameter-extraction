@@ -1,1 +1,6 @@
-**/__pycache__/
+# 虛擬環境
+.venv/
+
+# Python 暫存檔
+__pycache__/
+*.pyc

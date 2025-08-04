@@ -88,12 +88,15 @@ class EEHEMTEnv(gym.Env):
         self.initial_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
-        self.current_params = self.initial_params.copy()
         test_modified = config.get("test_modified", False)
         if test_modified:
             self.modified_initial_params = self.initial_params.copy()
             for name in self.tunable_param_names:
                 self.modified_initial_params[name] *= 1.5
+            self.current_params = self.modified_initial_params.copy()
+        else:
+            self.current_params = self.initial_params.copy()
+
 
         # Load measured data and set up sweep bias
         if not os.path.exists(self.csv_file_path):

@@ -1,0 +1,14 @@
+[project]
+name = "drl-on-parameter-extraction"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "gymnasium[accept-rom-license,atari,mujoco]>=1.0.0",
+    "matplotlib>=3.10.5",
+    "python-dotenv>=1.1.1",
+    "ray[rllib]>=2.48.0",
+    "torch>=2.7.1",
+    "verilogae>=1.0.0",
+]
