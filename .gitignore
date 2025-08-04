@@ -4,3 +4,9 @@
 # Python 暫存檔
 __pycache__/
 *.pyc
+
+# Jupyter Notebook 暫存檔
+.ipynb_checkpoints/
+
+# Augment Setup
+.augment/
