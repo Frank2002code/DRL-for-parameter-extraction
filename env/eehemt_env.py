@@ -89,8 +89,8 @@ class EEHEMTEnv(gym.Env):
         self.initial_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
-        test_modified = config.get("test_modified", False)
-        if test_modified:
+        self.test_modified = config.get("self.test_modified", False)
+        if self.test_modified:
             self.modified_initial_params = self.initial_params.copy()
             for name in self.tunable_param_names:
                 self.modified_initial_params[name] *= 1.2
@@ -113,7 +113,7 @@ class EEHEMTEnv(gym.Env):
             "br_esi": self.vgs,
         }
 
-        if test_modified:
+        if self.test_modified:
             self.i_meas = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
@@ -149,7 +149,7 @@ class EEHEMTEnv(gym.Env):
         self._running_stats_mean = 0.0
         self._running_stats_M2 = 0.0
 
-        self.max_episode_steps = 10000
+        self.max_episode_steps = 2000
         self.rmspe_threshold = 0.05
         self.current_step = 0
 
@@ -230,7 +230,10 @@ class EEHEMTEnv(gym.Env):
             tuple: A tuple containing the initial observation and info dictionary.
         """
         super().reset(seed=seed)
-        self.current_params = self.initial_params.copy()
+        if self.test_modified:
+            self.current_params = self.modified_initial_params.copy()
+        else:
+            self.current_params = self.initial_params.copy()
         self.current_step = 0
 
         initial_i_sim = self.eehemt_model.functions["Ids"].eval(
@@ -241,10 +244,10 @@ class EEHEMTEnv(gym.Env):
         self.initial_rmspe = self._calculate_rmspe(initial_i_sim)
         self.previous_rmspe = self.initial_rmspe
 
-        print(
-            f"Initial Params (tunable part): {{ {', '.join(f'{k}: {v:.4f}' for k, v in {name: self.current_params[name] for name in self.tunable_param_names}.items())} }}"
-        )
-        print(f"Initial RMSPE: {self.initial_rmspe:.4f}")
+        # print(
+        #     f"Initial Params (tunable part): {{ {', '.join(f'{k}: {v:.4f}' for k, v in {name: self.current_params[name] for name in self.tunable_param_names}.items())} }}"
+        # )
+        # print(f"Initial RMSPE: {self.initial_rmspe:.4f}")
 
         observation = self._get_obs(self.initial_rmspe)
         info = self._get_info(self.initial_rmspe)

@@ -48,7 +48,7 @@ if __name__ == "__main__":
         num_learners = 2
         num_gpus_per_learner = 1.0
 
-    parser.add_argument("--num-iterations", type=int, default=100)
+    parser.add_argument("--num_iterations", type=int, default=300)
 
     args = parser.parse_args()
 
