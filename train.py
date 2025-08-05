@@ -69,6 +69,9 @@ if __name__ == "__main__":
                 "test_modified": args.test_modified,
             },
         )
+        .env_runners(
+          observation_filter="MeanStdFilter",
+        )
         .training(
             train_batch_size_per_learner=2000,
             lr=0.0004,
