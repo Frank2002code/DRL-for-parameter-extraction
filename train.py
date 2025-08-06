@@ -2,10 +2,9 @@ import argparse
 
 from ray.rllib.algorithms.ppo import PPOConfig
 
-from env.eehemt_env import EEHEMTEnv, tunable_params_config
+from env.eehemt_env import EEHEMTEnv_Norm, tunable_params_config
 import torch as th
 # import os
-# import pprint
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -48,20 +47,15 @@ if __name__ == "__main__":
         num_learners = 2
         num_gpus_per_learner = 1.0
 
-    parser.add_argument("--num_iterations", type=int, default=300)
+    parser.add_argument("--n_iterations", type=int, default=300)
 
     args = parser.parse_args()
 
     # Configure.
-    # ray.init(
-    #     runtime_env={
-    #         "working_dir": ".",
-    #     }
-    # )
     config = (
         PPOConfig()
         .environment(
-            EEHEMTEnv,
+            EEHEMTEnv_Norm,
             env_config={
                 "csv_file_path": args.csv_file_path,
                 "tunable_params_config": tunable_params_config,
@@ -70,7 +64,7 @@ if __name__ == "__main__":
             },
         )
         .env_runners(
-          observation_filter="MeanStdFilter",
+          observation_filter="MeanStdFilter",  # Z-score norm better than L2 norm.
         )
         .training(
             train_batch_size_per_learner=2000,
@@ -85,12 +79,10 @@ if __name__ == "__main__":
     # Build the Algorithm.
     algo = config.build_algo()
 
-    # algo.train()
-    for i in range(args.num_iterations):
+    for i in range(args.n_iterations):
         results = algo.train()
 
-        print(f"--- Iteration: {i + 1}/{args.num_iterations} ---")
-        # pprint.pprint(results)
+        print(f"--- Iteration: {i + 1}/{args.n_iterations} ---")
     print("\nTraining completed.")
 
     # checkpoint_save_path = os.path.join(os.getcwd(), "checkpoints")

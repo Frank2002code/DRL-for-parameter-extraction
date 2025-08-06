@@ -4,6 +4,7 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+
 # Only available on Linux with python 3.11
 import verilogae  # type: ignore[import-untyped]
 from dotenv import load_dotenv
@@ -15,30 +16,30 @@ from utils.metrics import calculate_rmspe
 ALL_POSSIBLE_TUNABLE_PARAMS = {
     ## === 臨界電壓相關 ===
     # Vto 預設值: 0.258 。範圍設定涵蓋增強型(E-mode)與空乏型(D-mode)HEMT。
-    "Vto": {"min": -1.0, "max": 1.5, "step": 0.01},
+    "Vto": {"min": -1.0, "max": 1.5, "factor": 0.01},
     # Gamma 預設值: 0.0095 。通常為一個小的正值。
-    "Gamma": {"min": 0.0, "max": 0.3, "step": 0.001},
+    "Gamma": {"min": 0.0, "max": 0.3, "factor": 0.001},
     # Vch 預設值: 1.4 。此為影響臨界電壓的參數之一。
-    "Vch": {"min": 0.5, "max": 3.0, "step": 0.02},
+    "Vch": {"min": 0.5, "max": 3.0, "factor": 0.02},
     ## === 跨導與電流增益 ===
     # Gmmax 預設值: 0.168 。範圍涵蓋了典型的RF/功率元件。
-    "Gmmax": {"min": 0.05, "max": 0.5, "step": 0.002},
+    "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.002},
     # Deltgm 預設值: 0.252 。此為跨導的修正因子。
-    "Deltgm": {"min": 0.0, "max": 1.0, "step": 0.01},
+    "Deltgm": {"min": 0.0, "max": 1.0, "factor": 0.01},
     ## === 飽和區效應 ===
     # Vsat 預設值: 0.57 。決定I-V曲線膝點(knee)電壓，通常在1V上下。
-    "Vsat": {"min": 0.1, "max": 2.0, "step": 0.01},
+    "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.01},
     # Kapa 預設值: 0.069 。功能同通道長度調變 Lambda，值通常較小。
-    "Kapa": {"min": 0.0, "max": 0.3, "step": 0.001},
+    "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.001},
     # Alpha 預設值: 0.01 。作為轉態區的平滑化因子，通常為一小正數。
-    "Alpha": {"min": 0.001, "max": 0.2, "step": 0.001},
+    "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.001},
     # Peff 預設值: 1.53 。與自熱效應相關，範圍可較大。
-    "Peff": {"min": 0.5, "max": 10.0, "step": 0.05},
+    "Peff": {"min": 0.5, "max": 10.0, "factor": 0.05},
     ## === 寄生電阻 ===
     # Rs 預設值: 2.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rs": {"min": 0.1, "max": 10.0, "step": 0.1},
+    "Rs": {"min": 0.1, "max": 10.0, "factor": 0.1},
     # Rd 預設值: 1.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rd": {"min": 0.1, "max": 10.0, "step": 0.1},
+    "Rd": {"min": 0.1, "max": 10.0, "factor": 0.1},
 }
 
 # Get tunable params name from environment variable
@@ -88,17 +89,17 @@ class EEHEMTEnv(gym.Env):
         self.tunable_params_config = config.get("tunable_params_config", {})
         self.tunable_param_names = list(self.tunable_params_config.keys())
 
-        self.initial_params = {
+        self.init_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
         self.test_modified = config.get("test_modified", False)
         if self.test_modified:
-            self.modified_initial_params = self.initial_params.copy()
+            self.modified_init_params = self.init_params.copy()
             for name in self.tunable_param_names:
-                self.modified_initial_params[name] *= 1.2
-            self.current_params = self.modified_initial_params.copy()
+                self.modified_init_params[name] *= 1.2
+            self.current_params = self.modified_init_params.copy()
         else:
-            self.current_params = self.initial_params.copy()
+            self.current_params = self.init_params.copy()
 
         # Load measured data and set up sweep bias
         if not os.path.exists(self.csv_file_path):
@@ -119,7 +120,7 @@ class EEHEMTEnv(gym.Env):
             self.i_meas = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.initial_params,
+                **self.init_params,
             )
         else:
             # $ 原本用真正的 csv file 的 id 做 i_meas
@@ -127,7 +128,7 @@ class EEHEMTEnv(gym.Env):
 
         # Define Action Space
         action_deltas = np.array(
-            [config["step"] for config in self.tunable_params_config.values()],
+            [config["factor"] for config in self.tunable_params_config.values()],
             dtype=np.float32,
         )
         self.action_space = spaces.Box(
@@ -144,8 +145,8 @@ class EEHEMTEnv(gym.Env):
             low=low_bounds, high=high_bounds, dtype=np.float32
         )
 
-        self.initial_rmspe = -1.0
-        self.previous_rmspe = -1.0
+        self.init_rmspe = -1.0
+        self.prev_rmspe = -1.0
 
         self._running_stats_count = 1e-4
         self._running_stats_mean = 0.0
@@ -233,9 +234,9 @@ class EEHEMTEnv(gym.Env):
         """
         super().reset(seed=seed)
         if self.test_modified:
-            self.current_params = self.modified_initial_params.copy()
+            self.current_params = self.modified_init_params.copy()
         else:
-            self.current_params = self.initial_params.copy()
+            self.current_params = self.init_params.copy()
         self.current_step = 0
 
         initial_i_sim = self.eehemt_model.functions["Ids"].eval(
@@ -243,16 +244,16 @@ class EEHEMTEnv(gym.Env):
             voltages=self.sweep_bias,
             **self.current_params,
         )
-        self.initial_rmspe = calculate_rmspe(self.i_meas, initial_i_sim)
-        self.previous_rmspe = self.initial_rmspe
+        self.init_rmspe = calculate_rmspe(self.i_meas, initial_i_sim)
+        self.prev_rmspe = self.init_rmspe
 
         # print(
         #     f"Initial Params (tunable part): {{ {', '.join(f'{k}: {v:.4f}' for k, v in {name: self.current_params[name] for name in self.tunable_param_names}.items())} }}"
         # )
-        # print(f"Initial RMSPE: {self.initial_rmspe:.4f}")
+        # print(f"Initial RMSPE: {self.init_rmspe:.4f}")
 
-        observation = self._get_obs(self.initial_rmspe)
-        info = self._get_info(self.initial_rmspe)
+        observation = self._get_obs(self.init_rmspe)
+        info = self._get_info(self.init_rmspe)
 
         return observation, info
 
@@ -288,8 +289,8 @@ class EEHEMTEnv(gym.Env):
         )
 
         current_rmspe = calculate_rmspe(self.i_meas, i_sim)
-        reward = self.previous_rmspe - current_rmspe
-        self.previous_rmspe = current_rmspe
+        reward = self.prev_rmspe - current_rmspe
+        self.prev_rmspe = current_rmspe
 
         terminated = current_rmspe < self.rmspe_threshold
         truncated = self.current_step >= self.max_episode_steps
@@ -317,8 +318,8 @@ class EEHEMTEnv(gym.Env):
         Plots and compares I-V curves for different parameter sets.
 
         Args:
-            plot_initial (bool): Whether to plot the curve using self.initial_params.
-            plot_modified (bool): Whether to plot the curve using self.modified_initial_params.
+            plot_initial (bool): Whether to plot the curve using self.init_params.
+            plot_modified (bool): Whether to plot the curve using self.modified_init_params.
             plot_current (bool): Whether to plot the curve using self.current_params (optimized by the agent).
             save_path (str, optional): If provided, the plot will be saved to this path instead of being displayed.
         """
@@ -332,7 +333,7 @@ class EEHEMTEnv(gym.Env):
             i_sim_initial = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.initial_params,
+                **self.init_params,
             )
             plt.plot(self.vgs, i_sim_initial, "b--", label="Simulated (Initial Params)")
 
@@ -340,7 +341,7 @@ class EEHEMTEnv(gym.Env):
             i_sim_modified = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.modified_initial_params,
+                **self.modified_init_params,
             )
             plt.plot(
                 self.vgs,
@@ -376,7 +377,6 @@ class EEHEMTEnv(gym.Env):
 
         plt.close()
 
-
 class EEHEMTEnv_Norm(gym.Env):
     """
     A custom Gymnasium environment for optimizing EE-HEMT model parameters.
@@ -403,28 +403,36 @@ class EEHEMTEnv_Norm(gym.Env):
         self.temperature = config.get("temperature", 300.0)
         self.csv_file_path = config.get("csv_file_path", "")
 
-        # Initialize All Params
+        # === All Params (Including Tunable) Initialization ===
         self.tunable_params_config = config.get("tunable_params_config", {})
         self.tunable_param_names = list(self.tunable_params_config.keys())
         self.test_modified = config.get("test_modified", False)
 
-        self.initial_params = {
+        self.init_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
         if self.test_modified:
-            self.modified_initial_params = self.initial_params.copy()
+            self.modified_init_params = self.init_params.copy()
             for name in self.tunable_param_names:
-                self.modified_initial_params[name] *= 1.2
-            self.current_params = self.modified_initial_params.copy()
+                self.modified_init_params[name] *= 1.2
+            self.current_params = self.modified_init_params.copy()
         else:
-            self.current_params = self.initial_params.copy()
-        ## Add
+            self.current_params = self.init_params.copy()
+        ### New
         self.current_tunable_params = np.array(
             [self.current_params[name] for name in self.tunable_param_names],
             dtype=np.float32,
         )
+        self.TUNABLE_PARAMS_MIN = np.array(
+            [config["min"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )
+        self.TUNABLE_PARAMS_MAX = np.array(
+            [config["max"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )
 
-        # Load measured data and set up sweep bias
+        # === Load I_meas (y_true) and sweep bias ===
         if not os.path.exists(self.csv_file_path):
             raise FileNotFoundError(
                 f"Measured data file not found:: {self.csv_file_path}"
@@ -438,57 +446,59 @@ class EEHEMTEnv_Norm(gym.Env):
             "br_t": self.vgs,
             "br_esi": self.vgs,
         }
-
         if self.test_modified:
             self.i_meas = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.initial_params,
+                **self.init_params,
             )
         else:
             # $ 原本用真正的 csv file 的 id 做 i_meas
             self.i_meas = measured_data["id"].values
 
         # === Action Space Definition ===
-        self.action_space = spaces.Box(
-            low=-1.0, high=1.0, dtype=np.float32
-        )
-        self.previous_params_delta = np.zeros_like(self.current_tunable_params)
+        self.action_space = spaces.Box(low=-1.0, high=1.0, dtype=np.float32)
+        self.ACTION_FACTORS = np.array(
+            [config["factor"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )  # Linear transform better than independent function transform
+        self.prev_params_delta = np.zeros_like(self.current_tunable_params)
 
         # === Observation Space Definition ===
-        param_mins = [config["min"] for config in self.tunable_params_config.values()]
-        param_maxs = [config["max"] for config in self.tunable_params_config.values()]
+        # Observation space contains: [P_t, ΔP_{t-1}, E_t (raw error)]
+        param_low = [config["min"] for config in self.tunable_params_config.values()]
+        param_high = [config["max"] for config in self.tunable_params_config.values()]
 
-        low_bounds = np.append(param_mins, -np.inf).astype(np.float32)
-        high_bounds = np.append(param_maxs, np.inf).astype(np.float32)
+        prev_params_delta_low = -self.ACTION_FACTORS
+        prev_params_delta_high = self.ACTION_FACTORS
+
+        err_vector_low = np.full(len(self.i_meas), -np.inf)
+        err_vector_high = np.full(len(self.i_meas), np.inf)
+
+        low_bounds = np.concatenate(
+            [param_low, prev_params_delta_low, err_vector_low]
+        ).astype(np.float32)
+        high_bounds = np.concatenate(
+            [param_high, prev_params_delta_high, err_vector_high]
+        ).astype(np.float32)
         self.observation_space = spaces.Box(
             low=low_bounds, high=high_bounds, dtype=np.float32
         )
 
-        self.initial_rmspe = -1.0
-        self.previous_rmspe = -1.0
-
-        self._running_stats_count = 1e-4
-        self._running_stats_mean = 0.0
-        self._running_stats_M2 = 0.0
-
-        self.max_episode_steps = 2000
-        self.rmspe_threshold = 0.05
+        # === Episode Control ===
+        self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
+        self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.05))
         self.current_step = 0
 
-    def _update_running_stats(self, new_rmspe_value: float):
-        """
-        Updates the running mean and variance of the RMSPE using Welford's online algorithm.
-        This is used for observation normalization.
+        # === Error Initialization ===
+        self.init_rmspe = -1.0
+        self.prev_rmspe = -1.0  # For reward calculation
 
-        Args:
-            new_rmspe_value (float): The new RMSPE value to incorporate into the stats.
-        """
-        self._running_stats_count += 1
-        delta = new_rmspe_value - self._running_stats_mean
-        self._running_stats_mean += delta / self._running_stats_count
-        delta2 = new_rmspe_value - self._running_stats_mean
-        self._running_stats_M2 += delta * delta2
+        ### New
+        # === Stagnation (停滯) detection settings ===
+        self.STAGNATION_PATIENCE_STEPS = int(os.getenv("STAGNATION_PATIENCE_STEPS", 50))  # step 耐心值
+        self.STAGNATION_THRESHOLD = float(os.getenv("STAGNATION_THRESHOLD", 1e-6))  # 進展的門檻
+        self.stagnation_cnt = 0
 
     def _get_obs(self, i_sim: np.ndarray) -> np.ndarray:
         """
@@ -500,19 +510,17 @@ class EEHEMTEnv_Norm(gym.Env):
             np.ndarray: The observation vector.
         """
         # 1. P_t: Current tunable params vector
-        
+
         # 2. \Delta_P_{t-1}: Diff vector between current and previous params
-        
+
         # 3. E_t: Error vector between I_meas and I_sim
-        error_vector = self.i_meas - i_sim
-        # Normalize error vector
-        error_vector /= np.linalg.norm(error_vector)
-        
+        err_vector = self.i_meas - i_sim
+
         # 4. Combine observation vector
         obs = np.concatenate(
-            [self.current_tunable_params, self.previous_params_delta, error_vector]
+            [self.current_tunable_params, self.prev_params_delta, err_vector]
         ).astype(np.float32)
-        
+
         return obs
 
     def _get_info(self, rmspe: float) -> dict:
@@ -525,7 +533,12 @@ class EEHEMTEnv_Norm(gym.Env):
         Returns:
             dict: A dictionary containing auxiliary diagnostic information.
         """
-        return {"current_rmspe": rmspe, "current_params": self.current_params}
+        return {"current_rmspe": rmspe, "current_params": self.current_params.copy()}
+
+    ### New
+    def _transform_action(self, action: np.ndarray) -> np.ndarray:
+        """Inverse transform function: converts normalized action [-1, 1] to actual parameter changes."""
+        return action * self.ACTION_FACTORS
 
     def reset(self, seed: int | None = None, options: dict | None = None) -> tuple:
         """
@@ -540,26 +553,31 @@ class EEHEMTEnv_Norm(gym.Env):
         """
         super().reset(seed=seed)
         if self.test_modified:
-            self.current_params = self.modified_initial_params.copy()
+            self.current_params = self.modified_init_params.copy()
         else:
-            self.current_params = self.initial_params.copy()
-        self.current_step = 0
+            self.current_params = self.init_params.copy()
+        ### New
+        self.current_tunable_params = np.array(
+            [self.current_params[name] for name in self.tunable_param_names],
+            dtype=np.float32,
+        )
+        self.prev_params_delta = np.zeros_like(self.current_tunable_params)
 
-        initial_i_sim = self.eehemt_model.functions["Ids"].eval(
+        self.current_step = 0
+        ### New
+        self.stagnation_cnt = 0
+
+        # Calculate RMSPE for reward and info
+        init_i_sim = self.eehemt_model.functions["Ids"].eval(
             temperature=self.temperature,
             voltages=self.sweep_bias,
             **self.current_params,
         )
-        self.initial_rmspe = calculate_rmspe(self.i_meas, initial_i_sim)
-        self.previous_rmspe = self.initial_rmspe
+        self.init_rmspe = calculate_rmspe(self.i_meas, init_i_sim)
+        self.prev_rmspe = self.init_rmspe
 
-        # print(
-        #     f"Initial Params (tunable part): {{ {', '.join(f'{k}: {v:.4f}' for k, v in {name: self.current_params[name] for name in self.tunable_param_names}.items())} }}"
-        # )
-        # print(f"Initial RMSPE: {self.initial_rmspe:.4f}")
-
-        observation = self._get_obs(self.initial_rmspe)
-        info = self._get_info(self.initial_rmspe)
+        observation = self._get_obs(init_i_sim)
+        info = self._get_info(self.init_rmspe)
 
         return observation, info
 
@@ -579,37 +597,54 @@ class EEHEMTEnv_Norm(gym.Env):
         """
         self.current_step += 1
 
-        for i, param_name in enumerate(self.tunable_param_names):
-            self.current_params[param_name] += action[i]
-            min_val = self.tunable_params_config[param_name]["min"]
-            max_val = self.tunable_params_config[param_name]["max"]
-            self.current_params[param_name] = np.clip(
-                self.current_params[param_name], min_val, max_val
-            )
+        ### New
+        # === Update parameters and ensure they are within defined bounds ===
+        tunable_params_delta = self.prev_params_delta = self._transform_action(action)
+        self.current_tunable_params += tunable_params_delta
+        self.current_tunable_params = np.clip(
+            self.current_tunable_params,
+            self.TUNABLE_PARAMS_MIN,
+            self.TUNABLE_PARAMS_MAX,
+        )
+        updated_tunable_part = dict(
+            zip(self.tunable_param_names, self.current_tunable_params)
+        )
+        self.current_params.update(updated_tunable_part)
 
-        params_for_eval = {k: float(v) for k, v in self.current_params.items()}
+        current_params_float = {
+            k: float(v) for k, v in self.current_params.items()
+        }  # np.float32 -> float
         i_sim = self.eehemt_model.functions["Ids"].eval(
             temperature=self.temperature,
             voltages=self.sweep_bias,
-            **params_for_eval,
+            **current_params_float,
         )
 
+        # === Calculate RMSPE for reward, termination conditions, and info ===
         current_rmspe = calculate_rmspe(self.i_meas, i_sim)
-        reward = self.previous_rmspe - current_rmspe
-        self.previous_rmspe = current_rmspe
+        reward = self.prev_rmspe - current_rmspe
+        self.prev_rmspe = current_rmspe
 
-        terminated = current_rmspe < self.rmspe_threshold
-        truncated = self.current_step >= self.max_episode_steps
+        # === Get the next observation and info ===
+        observation = self._get_obs(i_sim)
+        info = self._get_info(current_rmspe)
 
-        if terminated:
-            print(
-                f"Success! RMSPE ({current_rmspe:.4f}) has reached the threshold ({self.rmspe_threshold})."
-            )
+        # === Check Termination Conditions ===
+        terminated_success = current_rmspe < self.RMSPE_THRESHOLD
+        if abs(reward) < self.STAGNATION_THRESHOLD:
+            self.stagnation_cnt += 1
+        else:
+            self.stagnation_cnt = 0
+        terminated_stagnation = self.stagnation_cnt >= self.STAGNATION_PATIENCE_STEPS
+        terminated = terminated_success or terminated_stagnation
+        truncated = self.current_step >= self.MAX_EPISODE_STEPS
+
+        if terminated_success:
+            print(f"Success! RMSPE ({current_rmspe:.4f}) has reached the threshold ({self.RMSPE_THRESHOLD}).")
+        if terminated_stagnation:
+            print(f"Terminated due to stagnation ({self.STAGNATION_PATIENCE_STEPS} steps with little improvement).")
         if truncated and not terminated:
             print("Reached maximum steps.")
-
-        observation = self._get_obs(current_rmspe)
-        info = self._get_info(current_rmspe)
 
         return observation, reward, terminated, truncated, info
 
@@ -624,8 +659,8 @@ class EEHEMTEnv_Norm(gym.Env):
         Plots and compares I-V curves for different parameter sets.
 
         Args:
-            plot_initial (bool): Whether to plot the curve using self.initial_params.
-            plot_modified (bool): Whether to plot the curve using self.modified_initial_params.
+            plot_initial (bool): Whether to plot the curve using self.init_params.
+            plot_modified (bool): Whether to plot the curve using self.modified_init_params.
             plot_current (bool): Whether to plot the curve using self.current_params (optimized by the agent).
             save_path (str, optional): If provided, the plot will be saved to this path instead of being displayed.
         """
@@ -639,7 +674,7 @@ class EEHEMTEnv_Norm(gym.Env):
             i_sim_initial = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.initial_params,
+                **self.init_params,
             )
             plt.plot(self.vgs, i_sim_initial, "b--", label="Simulated (Initial Params)")
 
@@ -647,7 +682,7 @@ class EEHEMTEnv_Norm(gym.Env):
             i_sim_modified = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **self.modified_initial_params,
+                **self.modified_init_params,
             )
             plt.plot(
                 self.vgs,
@@ -657,11 +692,11 @@ class EEHEMTEnv_Norm(gym.Env):
             )
 
         if plot_current:
-            params_for_eval = {k: float(v) for k, v in self.current_params.items()}
+            current_params_float = {k: float(v) for k, v in self.current_params.items()}
             i_sim_current = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
-                **params_for_eval,
+                **current_params_float,
             )
             plt.plot(self.vgs, i_sim_current, "r-", label="Simulated (Current Params)")
 

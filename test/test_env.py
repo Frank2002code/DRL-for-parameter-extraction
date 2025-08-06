@@ -1,16 +1,15 @@
 import os
 
-from env.eehemt_env import EEHEMTEnv, tunable_params_config
+from env.eehemt_env import EEHEMTEnv_Norm, tunable_params_config
 
 if __name__ == "__main__":
-
     config = {
         "csv_file_path": "/home/u5977862/DRL-on-parameter-extraction/data/S25E02A025WS_25C_GMVG.csv",
         "tunable_params_config": tunable_params_config,
         "va_file_path": "/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
         "test_modified": True,
     }
-    env = EEHEMTEnv(
+    env = EEHEMTEnv_Norm(
         config,
     )
 
