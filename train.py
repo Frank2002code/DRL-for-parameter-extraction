@@ -1,31 +1,15 @@
 import argparse
+import pprint
 
+import ray
+import torch as th
 from ray.rllib.algorithms.ppo import PPOConfig
 
 from env.eehemt_env import EEHEMTEnv_Norm, tunable_params_config
-import torch as th
-# import os
+from utils.evaluate import eval_func
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-
-    # tunable_params_config = {
-    #     # === Threshold Voltage Related ===
-    #     "Vto": {"min": -0.5, "max": 1.0, "delta": 0.01},
-    #     "Gamma": {"min": 0.0, "max": 0.5, "delta": 0.001},
-    #     "Vch": {"min": 0.5, "max": 3.0, "delta": 0.05},
-    #     # === Transconductance & Current Gain ===
-    #     "Gmmax": {"min": 0.05, "max": 0.5, "delta": 0.005},
-    #     "Deltgm": {"min": 0.0, "max": 1.0, "delta": 0.01},
-    #     # === Saturation Effects ===
-    #     "Vsat": {"min": 0.1, "max": 2.0, "delta": 0.02},
-    #     "Kapa": {"min": 0.0, "max": 0.5, "delta": 0.005},
-    #     "Alpha": {"min": 0.001, "max": 0.2, "delta": 0.001},
-    #     "Peff": {"min": 0.1, "max": 5.0, "delta": 0.1},
-    #     # === Parasitic Resistances ===
-    #     "Rs": {"min": 0.0, "max": 10.0, "delta": 0.2},
-    #     "Rd": {"min": 0.0, "max": 10.0, "delta": 0.2},
-    # }
 
     parser.add_argument(
         "--csv_file_path",
@@ -38,6 +22,7 @@ if __name__ == "__main__":
         default="/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
     )
     parser.add_argument("--test_modified", type=bool, default=True)
+    parser.add_argument("--train_batch_size_per_learner", type=int, default=128)
     # parser.add_argument("--num_learners", type=int, default=4)
     # parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
     if th.cuda.device_count() == 4:
@@ -64,15 +49,25 @@ if __name__ == "__main__":
             },
         )
         .env_runners(
-          observation_filter="MeanStdFilter",  # Z-score norm better than L2 norm.
+            observation_filter="MeanStdFilter",  # Z-score norm better than L2 norm.
         )
         .training(
-            train_batch_size_per_learner=2000,
+            train_batch_size_per_learner=args.train_batch_size_per_learner,
             lr=0.0004,
         )
         .learners(
             num_learners=num_learners,
             num_gpus_per_learner=num_gpus_per_learner,
+        )
+        .evaluation(
+            # We only need one evaluation worker for plotting
+            evaluation_num_env_runners=1,
+            # We will call `evaluate()` manually, so no interval is needed.
+            evaluation_interval=None,
+            # Point to our custom function
+            custom_evaluation_function=eval_func,
+            # Ensure evaluation is deterministic
+            evaluation_config={"explore": False},
         )
     )
 
@@ -81,12 +76,23 @@ if __name__ == "__main__":
 
     for i in range(args.n_iterations):
         results = algo.train()
-
         print(f"--- Iteration: {i + 1}/{args.n_iterations} ---")
-    print("\nTraining completed.")
+        episode_reward_mean = results.get('episode_reward_mean', float('nan'))
+        print(f"Episode Reward Mean: {episode_reward_mean:.4f}")
 
-    # checkpoint_save_path = os.path.join(os.getcwd(), "checkpoints")
-    checkpoint_dir = algo.save_to_path()
-    print(f"saved algo to {checkpoint_dir}")
+    print("\n--- Training completed. ---")
+
+    # === Evaluation ===
+    final_results = algo.evaluate()
+    print("\n--- Custom evaluation results ---")
+    pprint.pprint(final_results)
+
+    checkpoint_dir = "/home/u5977862/DRL-on-parameter-extraction/result/ckpt"
+    checkpoint_dir = algo.save_to_path(checkpoint_dir)
+    print(f"\nFinal algorithm checkpoint saved to: {checkpoint_dir}")
+
+    algo.stop()
+    ray.shutdown()
+    print("\n--- Script finished. ---")
 
     algo.stop()
