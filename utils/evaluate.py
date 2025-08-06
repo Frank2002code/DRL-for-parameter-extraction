@@ -19,7 +19,7 @@ def eval_func(
     # 1. Get the local evaluation worker, its environment, and the trained policy.
     local_worker = eval_workers.local_env_runner
     env = local_worker.env
-    policy = algorithm.get_policy()
+    policy = local_worker.get_policy()
 
     # 2. Run a single, deterministic episode to find the best parameters.
     obs, info = env.reset()
