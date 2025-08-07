@@ -1,12 +1,10 @@
 import argparse
-import pprint
 
-import ray
 import torch as th
 from ray.rllib.algorithms.ppo import PPOConfig
 
 from env.eehemt_env import EEHEMTEnv_Norm, tunable_params_config
-from utils.evaluate import eval_func
+from utils.callbacks import CustomEvalCallbacks
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -32,7 +30,7 @@ if __name__ == "__main__":
         num_learners = 2
         num_gpus_per_learner = 1.0
 
-    parser.add_argument("--n_iterations", type=int, default=300)
+    parser.add_argument("--n_iterations", type=int, default=100)
 
     args = parser.parse_args()
 
@@ -59,14 +57,14 @@ if __name__ == "__main__":
             num_learners=num_learners,
             num_gpus_per_learner=num_gpus_per_learner,
         )
+        .callbacks(CustomEvalCallbacks)
         .evaluation(
             # We only need one evaluation worker for plotting
+            evaluation_interval=1,
             evaluation_num_env_runners=1,
-            # We will call `evaluate()` manually, so no interval is needed.
-            evaluation_interval=None,
-            # Point to our custom function
-            custom_evaluation_function=eval_func,
-            # Ensure evaluation is deterministic
+            evaluation_duration=1,  # Only one episode for evaluation
+            evaluation_duration_unit="episodes",
+            # custom_evaluation_function=eval_func,
             evaluation_config={"explore": False},
         )
     )
@@ -77,22 +75,35 @@ if __name__ == "__main__":
     for i in range(args.n_iterations):
         results = algo.train()
         print(f"--- Iteration: {i + 1}/{args.n_iterations} ---")
-        episode_reward_mean = results.get('episode_reward_mean', float('nan'))
-        print(f"Episode Reward Mean: {episode_reward_mean:.4f}")
 
     print("\n--- Training completed. ---")
 
     # === Evaluation ===
-    final_results = algo.evaluate()
-    print("\n--- Custom evaluation results ---")
-    pprint.pprint(final_results)
+    # print("\n--- Running final evaluation ---")
+    # eval_results = algo.evaluate()
+    # try:
+    #     first_episode_metrics = eval_results["evaluation"]["custom_metrics_per_episode"][0]
+    #     print("\n--- Keys available in custom_metrics_per_episode ---")
+    #     print(first_episode_metrics.keys())
+    #     print("--------------------------------------------------\n")
+
+    #     final_rmspe = first_episode_metrics["final_rmspe"]
+    #     plot_data = first_episode_metrics["plot_data"]
+
+    #     print(f"Final RMSPE: {final_rmspe:.4f}")
+    #     plot_iv_curve(
+    #         plot_data=plot_data,
+    #         plot_initial=True,
+    #         plot_modified=True,
+    #         plot_current=True,
+    #         save_path="results/final_iv_curve.png"
+    #     )
+    # except (KeyError, IndexError) as e:
+    #     print(f"\nCould not extract custom metrics for plotting. Error: {e}")
+    #     pprint.pprint(eval_results)
 
     checkpoint_dir = "/home/u5977862/DRL-on-parameter-extraction/result/ckpt"
     checkpoint_dir = algo.save_to_path(checkpoint_dir)
     print(f"\nFinal algorithm checkpoint saved to: {checkpoint_dir}")
 
-    algo.stop()
-    ray.shutdown()
     print("\n--- Script finished. ---")
-
-    algo.stop()

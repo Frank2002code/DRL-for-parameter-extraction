@@ -10,3 +10,5 @@ __pycache__/
 
 # Augment Setup
 .augment/
+
+result/
