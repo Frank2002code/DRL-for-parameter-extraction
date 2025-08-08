@@ -71,6 +71,7 @@ for name in tunable_param_names:
 ### New
 EPSILON = 1e-9
 
+
 class EEHEMTEnv(gym.Env):
     """
     A custom Gymnasium environment for optimizing EE-HEMT model parameters.
@@ -153,9 +154,7 @@ class EEHEMTEnv(gym.Env):
 
         low_bounds = np.append(param_mins, -np.inf).astype(np.float32)
         high_bounds = np.append(param_maxs, np.inf).astype(np.float32)
-        self.observation_space = Box(
-            low=low_bounds, high=high_bounds, dtype=np.float32
-        )
+        self.observation_space = Box(low=low_bounds, high=high_bounds, dtype=np.float32)
 
         self.init_rmspe = -1.0
         self.prev_rmspe = -1.0
@@ -494,9 +493,7 @@ class EEHEMTEnv_Norm(gym.Env):
         high_bounds = np.concatenate(
             [param_high, prev_params_delta_high, err_vector_high]
         ).astype(np.float32)
-        self.observation_space = Box(
-            low=low_bounds, high=high_bounds, dtype=np.float32
-        )
+        self.observation_space = Box(low=low_bounds, high=high_bounds, dtype=np.float32)
 
         # === Episode Control ===
         self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
@@ -800,9 +797,9 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         self.eehemt_model = verilogae.load(config.get("va_file_path", ""))
         self.temperature = config.get("temperature", 300.0)
         self.csv_file_path = config.get("csv_file_path", "")
-        
+
         ### New
-        self.vto_values = [-1.0, -0.72, -0.44, -0.16, 0.11, 0.38, 0.66, 0.94, 1.22, 1.5]
+        self.vto_values = [float(v) for v in os.getenv("VTO_VALUES", "-1.0,-0.72,-0.44,-0.16,0.11").split(",")]
         self.num_vtos = len(self.vto_values)
 
         # === All Params (Including Tunable) Initialization ===
@@ -818,7 +815,7 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         }
         ### New
         self.init_params["Vto"] = self.vto_values[0]  # Set default Vto
-        
+
         ### New
         INIT_PARAMS_SHIFT_FACTOR = float(os.getenv("INIT_PARAMS_SHIFT_FACTOR", 1.2))
         if self.test_modified:
@@ -866,8 +863,9 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
                 vto: self.eehemt_model.functions["Ids"].eval(
                     temperature=self.temperature,
                     voltages=self.sweep_bias,
-                    **(self.init_params | {"Vto": float(vto)})
-                ) for vto in self.vto_values
+                    **(self.init_params | {"Vto": float(vto)}),
+                )
+                for vto in self.vto_values
             }
             print("\nSynthetic target data generation complete.\n")
         else:
@@ -901,9 +899,7 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         high_bounds = np.concatenate(
             [param_high, prev_params_delta_high, err_vector_high]
         ).astype(np.float32)
-        self.observation_space = Box(
-            low=low_bounds, high=high_bounds, dtype=np.float32
-        )
+        self.observation_space = Box(low=low_bounds, high=high_bounds, dtype=np.float32)
 
         # === Episode Control ===
         self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
@@ -960,38 +956,46 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
     def _transform_action(self, action: np.ndarray) -> np.ndarray:
         """Inverse transform function: converts normalized action [-1, 1] to actual parameter changes."""
         return action * self.ACTION_FACTORS
-    
+
     ### New
     def _run_all_vto_sim(self) -> tuple[np.ndarray, np.ndarray]:
         """
         NEW: Helper function to run simulations for all Vto conditions.
 
         Returns:
-            tuple[np.ndarray, np.ndarray]: 
+            tuple[np.ndarray, np.ndarray]:
                 - A flattened numpy array containing all concatenated error vectors.
                 - A numpy array of RMSPE values for each Vto condition.
         """
         all_i_meas_matrix = np.array([self.i_meas_dict[vto] for vto in self.vto_values])
-        
-        current_params_float = {k: float(v) for k, v in self.current_params.items()}
-        all_i_sim_matrix = np.array([
-            self.eehemt_model.functions["Ids"].eval(
-                temperature=self.temperature,
-                voltages=self.sweep_bias,
-                # The `|` operator merges the base parameters with the current Vto
-                **(current_params_float | {"Vto": vto})
-            ) for vto in self.vto_values
-        ])
 
-        all_err_matrix = all_i_meas_matrix - all_i_sim_matrix  # self.i_meas - all_i_sim_matrix
+        current_params_float = {k: float(v) for k, v in self.current_params.items()}
+        all_i_sim_matrix = np.array(
+            [
+                self.eehemt_model.functions["Ids"].eval(
+                    temperature=self.temperature,
+                    voltages=self.sweep_bias,
+                    # The `|` operator merges the base parameters with the current Vto
+                    **(current_params_float | {"Vto": vto}),
+                )
+                for vto in self.vto_values
+            ]
+        )
+
+        all_err_matrix = (
+            all_i_meas_matrix - all_i_sim_matrix
+        )  # self.i_meas - all_i_sim_matrix
 
         concat_err_vector = all_err_matrix.flatten().astype(np.float32)
 
         # Calculate RMSPE for each I-V curve (each row).
-        rmspe_vals = np.array([
-            calculate_rmspe(i_meas_row, i_sim_row)
-            for i_meas_row, i_sim_row in zip(all_i_meas_matrix, all_i_sim_matrix)
-        ], dtype=np.float32)
+        rmspe_vals = np.array(
+            [
+                calculate_rmspe(i_meas_row, i_sim_row)
+                for i_meas_row, i_sim_row in zip(all_i_meas_matrix, all_i_sim_matrix)
+            ],
+            dtype=np.float32,
+        )
 
         return concat_err_vector, rmspe_vals
 
@@ -1113,7 +1117,8 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         if terminated or truncated:
             info["final_rmspe"] = current_rmspe
             # info["final_params"] = self.current_params
-            info["i_sim_current"] = self._get_i_sim_current()
+            # info["i_sim_current"] = self._get_i_sim_current()
+            info["i_sim_current_matrix"] = self._get_i_sim_current_matrix()
 
         return observation, reward, terminated, truncated, info
 
@@ -1128,7 +1133,9 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         Plots and compares I-V curves.
         The target curve is chosen to be the one corresponding to the FIRST Vto value.
         """
-        i_meas = self.i_meas_dict[self.vto_values[0]]  # Use the first Vto value as target
+        i_meas = self.i_meas_dict[
+            self.vto_values[0]
+        ]  # Use the first Vto value as target
         plt.figure(figsize=(10, 7))
         plt.plot(self.vgs, i_meas, "ko", label="Measured Data (Target)")
 
@@ -1138,7 +1145,12 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
                 voltages=self.sweep_bias,
                 **self.init_params,
             )
-            plt.plot(self.vgs, i_sim_initial, "b--", label=f"Simulated (Initial, Vto={self.init_params.get('Vto'):.2f})")
+            plt.plot(
+                self.vgs,
+                i_sim_initial,
+                "b--",
+                label=f"Simulated (Initial, Vto={self.init_params.get('Vto'):.2f})",
+            )
 
         if plot_modified and self.test_modified:
             i_sim_modified = self.eehemt_model.functions["Ids"].eval(
@@ -1154,14 +1166,19 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             )
 
         if plot_current:
-            current_vto = self.current_params.get('Vto')
+            current_vto = self.current_params.get("Vto")
             current_params_float = {k: float(v) for k, v in self.current_params.items()}
             i_sim_current = self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
                 **current_params_float,
             )
-            plt.plot(self.vgs, i_sim_current, "r-", label=f"Simulated (Current, Vto={current_vto:.2f})")
+            plt.plot(
+                self.vgs,
+                i_sim_current,
+                "r-",
+                label=f"Simulated (Current, Vto={current_vto:.2f})",
+            )
 
         plt.title("I-V Curve Comparison")
         plt.xlabel("Gate Voltage (Vg) [V]")
@@ -1189,11 +1206,15 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             **self.init_params,
         )
         # Simulate Modified Curve
-        i_sim_modified = self.eehemt_model.functions["Ids"].eval(
-            temperature=self.temperature,
-            voltages=self.sweep_bias,
-            **self.modified_init_params,
-        ) if self.test_modified else np.zeros_like(self.vgs)
+        i_sim_modified = (
+            self.eehemt_model.functions["Ids"].eval(
+                temperature=self.temperature,
+                voltages=self.sweep_bias,
+                **self.modified_init_params,
+            )
+            if self.test_modified
+            else np.zeros_like(self.vgs)
+        )
         # Simulate Current Curve
         # current_params_float = {k: float(v) for k, v in self.current_params.items()}
         # i_sim_current = self.eehemt_model.functions["Ids"].eval(
@@ -1211,9 +1232,33 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             ### New
             "vto": first_vto,
         }
-        
+
     ### New
-    def _get_i_sim_current(self):
+    def _get_plot_data_matrix(self):
+        i_sim_initial_matrix = np.array([
+            self.eehemt_model.functions["Ids"].eval(
+                temperature=self.temperature,
+                voltages=self.sweep_bias,
+                **(self.init_params | {"Vto": float(vto)})
+            ) for vto in self.vto_values
+        ])
+        i_sim_modified_matrix = np.array([
+            self.eehemt_model.functions["Ids"].eval(
+                temperature=self.temperature,
+                voltages=self.sweep_bias,
+                **(self.modified_init_params | {"Vto": float(vto)})
+            ) for vto in self.vto_values
+        ]) if self.test_modified else np.zeros((len(self.vto_values), len(self.vgs)))
+
+        return {
+            "vgs": self.vgs,
+            "i_meas_dict": self.i_meas_dict,
+            "i_sim_initial_matrix": i_sim_initial_matrix,
+            "i_sim_modified_matrix": i_sim_modified_matrix,
+        }
+
+    ### New
+    def _get_i_sim_current(self) -> dict:
         """
         Returns only the DYNAMIC data for plotting at the end of an episode.
         """
@@ -1226,3 +1271,22 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         )
 
         return {"i_sim_current": i_sim_current}
+
+    def _get_i_sim_current_matrix(self) -> dict[str, np.ndarray]:
+        """
+        Returns the DYNAMIC data matrix for plotting at the end of an episode.
+        """
+        current_params_float = {k: float(v) for k, v in self.current_params.items()}
+        i_sim_current_matrix = np.array(
+            [
+                self.eehemt_model.functions["Ids"].eval(
+                    temperature=self.temperature,
+                    voltages=self.sweep_bias,
+                    # The `|` operator merges the base parameters with the current Vto
+                    **(current_params_float | {"Vto": vto}),
+                )
+                for vto in self.vto_values
+            ]
+        )
+
+        return {"i_sim_current_matrix": i_sim_current_matrix}

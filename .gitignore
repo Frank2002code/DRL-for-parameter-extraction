@@ -11,4 +11,9 @@ __pycache__/
 # Augment Setup
 .augment/
 
-result/
+# Test 文件
+test/
+
+# Result Dir
+result/*
+!result/iv_curve/08-08-*
