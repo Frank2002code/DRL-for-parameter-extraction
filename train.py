@@ -3,12 +3,13 @@ import argparse
 import torch as th
 from ray.rllib.algorithms.ppo import PPOConfig
 
-from env.eehemt_env import EEHEMTEnv_Norm, tunable_params_config
+from env.eehemt_env import EEHEMTEnv_Norm_Vtos, tunable_params_config
 from utils.callbacks import CustomEvalCallbacks
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
 
+    # === Env arguments ===
     parser.add_argument(
         "--csv_file_path",
         type=str,
@@ -20,7 +21,17 @@ if __name__ == "__main__":
         default="/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
     )
     parser.add_argument("--test_modified", type=bool, default=True)
-    parser.add_argument("--train_batch_size_per_learner", type=int, default=128)
+
+    # === Env runner arguments ===
+    parser.add_argument("--num_env_runners", type=int, default=2)
+
+    # === Training arguments ===
+    parser.add_argument("--train_batch_size_per_learner", type=int, default=4096)
+    parser.add_argument("--num_epochs", type=int, default=5)
+    parser.add_argument("--minibatch_size", type=int, default=512)
+    parser.add_argument("--n_iterations", type=int, default=100)
+    
+    # === Learner arguments ===
     # parser.add_argument("--num_learners", type=int, default=4)
     # parser.add_argument("--num_gpus_per_learner", type=float, default=1.0)
     if th.cuda.device_count() == 4:
@@ -30,15 +41,13 @@ if __name__ == "__main__":
         num_learners = 2
         num_gpus_per_learner = 1.0
 
-    parser.add_argument("--n_iterations", type=int, default=100)
-
     args = parser.parse_args()
 
     # Configure.
     config = (
         PPOConfig()
         .environment(
-            EEHEMTEnv_Norm,
+            EEHEMTEnv_Norm_Vtos,
             env_config={
                 "csv_file_path": args.csv_file_path,
                 "tunable_params_config": tunable_params_config,
@@ -47,11 +56,17 @@ if __name__ == "__main__":
             },
         )
         .env_runners(
+            num_env_runners=args.num_env_runners,
             observation_filter="MeanStdFilter",  # Z-score norm better than L2 norm.
         )
         .training(
             train_batch_size_per_learner=args.train_batch_size_per_learner,
-            lr=0.0004,
+            num_epochs=args.num_epochs,
+            minibatch_size=args.minibatch_size,
+            lr=0.00015 * num_learners,
+        )
+        .rl_module(
+            
         )
         .learners(
             num_learners=num_learners,

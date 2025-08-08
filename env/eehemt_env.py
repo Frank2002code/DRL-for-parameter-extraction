@@ -968,12 +968,14 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
                 - A numpy array of RMSPE values for each Vto condition.
         """
         all_i_meas_matrix = np.array([self.i_meas_dict[vto] for vto in self.vto_values])
+        
+        current_params_float = {k: float(v) for k, v in self.current_params.items()}
         all_i_sim_matrix = np.array([
             self.eehemt_model.functions["Ids"].eval(
                 temperature=self.temperature,
                 voltages=self.sweep_bias,
                 # The `|` operator merges the base parameters with the current Vto
-                **(self.current_params | {"Vto": vto})
+                **(current_params_float | {"Vto": vto})
             ) for vto in self.vto_values
         ])
 
@@ -1171,7 +1173,8 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         plt.close()
 
     def _get_plot_data(self):
-        i_meas = self.i_meas_dict[self.vto_values[0]]
+        first_vto = self.vto_values[0]
+        i_meas = self.i_meas_dict[first_vto]
 
         # Simulate Initial Curve
         i_sim_initial = self.eehemt_model.functions["Ids"].eval(
@@ -1199,4 +1202,6 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             "i_sim_initial": i_sim_initial,
             "i_sim_modified": i_sim_modified,
             "i_sim_current": i_sim_current,
+            ### New
+            "vto": first_vto,
         }

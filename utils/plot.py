@@ -9,7 +9,7 @@ def plot_iv_curve(
     save_path: str | None = None,
 ):
     """
-    使用預先計算好的數據來繪製 I-V 曲線圖。
+    Use pre-calculated data to plot the I-V curve.
     """
     output_dir = os.path.dirname(save_path) if save_path else "results"
     os.makedirs(output_dir, exist_ok=True)
@@ -21,13 +21,13 @@ def plot_iv_curve(
 
     # Plot simulated curves based on options
     if plot_initial:
-        plt.plot(plot_data['vgs'], plot_data['i_sim_initial'], "b--", label="Simulated (Initial Params)")
+        plt.plot(plot_data['vgs'], plot_data['i_sim_initial'], "b--", label=f"Simulated (Initial Params, Vto={plot_data['vto']:.2f})")
 
     if plot_modified:
-        plt.plot(plot_data['vgs'], plot_data['i_sim_modified'], "g-.", label="Simulated (Modified Initial Params)")
+        plt.plot(plot_data['vgs'], plot_data['i_sim_modified'], "g-.", label=f"Simulated (Modified Initial Params, Vto={plot_data['vto']:.2f})")
 
     if plot_current:
-        plt.plot(plot_data['vgs'], plot_data['i_sim_current'], "r-", label="Simulated (Current Params)")
+        plt.plot(plot_data['vgs'], plot_data['i_sim_current'], "r-", label=f"Simulated (Current Params, Vto={plot_data['vto']:.2f})")
 
     # Style the plot
     plt.title("I-V Curve Comparison")

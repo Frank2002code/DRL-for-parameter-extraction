@@ -21,8 +21,5 @@ class CustomEvalCallbacks(DefaultCallbacks):
             print(f"\n=====Final RMSPE: {rmspe:.4f}=====")
             plot_iv_curve(
                 plot_data=plot_data,
-                plot_initial=True,
-                plot_modified=True,
-                plot_current=True,
-                save_path="result/final_iv_curve.png"
+                save_path="result/final_iv_curve.png",
             )
