@@ -32,7 +32,7 @@ def plot_iv_curve(
     # Style the plot
     plt.title("I-V Curve Comparison")
     plt.xlabel("Gate Voltage (Vg) [V]")
-    plt.ylabel("Drain Current (Id) [A]")
+    plt.ylabel("Log Drain Current (Id) [A]")
     plt.yscale("log")
     plt.grid(True, which="both", ls="--")
     plt.legend()

@@ -68,7 +68,8 @@ for name in tunable_param_names:
         print(
             f"Warning: Parameter '{name}' from environment variable not found in master config. Skipping."
         )
-
+### New
+EPSILON = 1e-9
 
 class EEHEMTEnv(gym.Env):
     """
@@ -1076,7 +1077,9 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
 
         # === Calculate RMSPE for reward, termination conditions, and info ===
         current_rmspe = np.mean(rmspe_vals)
-        reward = self.prev_rmspe - current_rmspe
+        ### New
+        reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
+        reward = np.clip(reward, -1.0, 1.0)  # Normalize reward to [-1, 1]
         self.prev_rmspe = current_rmspe
 
         # === Get the next observation and info ===

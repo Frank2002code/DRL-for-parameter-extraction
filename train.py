@@ -18,7 +18,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--va_file_path",
         type=str,
-        default="/home/u5977862/DRL-on-parameter-extraction/eehemt/eehemt114_2.va",
+        default="/home/u5977862/DRL-on-parameter-extraction/env/eehemt/eehemt114_2.va",
     )
     parser.add_argument("--test_modified", type=bool, default=True)
 
@@ -43,7 +43,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    # Configure.
+    # === Algo Configure ===
     config = (
         PPOConfig()
         .environment(
@@ -84,7 +84,7 @@ if __name__ == "__main__":
         )
     )
 
-    # Build the Algorithm.
+    # Build Algo instance
     algo = config.build_algo()
 
     for i in range(args.n_iterations):
