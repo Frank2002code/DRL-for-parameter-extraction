@@ -4,7 +4,8 @@ import torch as th
 from ray.rllib.algorithms.ppo import PPOConfig
 
 from env.eehemt_env import EEHEMTEnv_Norm_Vtos, tunable_params_config
-from utils.callbacks import CustomEvalCallbacks
+# from utils.callbacks import CustomEvalCallbacks
+from utils.plot import PlotCurve
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -29,7 +30,8 @@ if __name__ == "__main__":
     parser.add_argument("--train_batch_size_per_learner", type=int, default=4096)
     parser.add_argument("--num_epochs", type=int, default=5)
     parser.add_argument("--minibatch_size", type=int, default=512)
-    parser.add_argument("--n_iterations", type=int, default=100)
+    parser.add_argument("--entropy_coeff", type=float, default=1e-2)
+    parser.add_argument("--n_iterations", type=int, default=50)  # 100 -> 50
     
     # === Learner arguments ===
     # parser.add_argument("--num_learners", type=int, default=4)
@@ -64,6 +66,8 @@ if __name__ == "__main__":
             num_epochs=args.num_epochs,
             minibatch_size=args.minibatch_size,
             lr=0.00015 * num_learners,
+            ### New
+            entropy_coeff=args.entropy_coeff,  # type: ignore
         )
         .rl_module(
             
@@ -72,7 +76,8 @@ if __name__ == "__main__":
             num_learners=num_learners,
             num_gpus_per_learner=num_gpus_per_learner,
         )
-        .callbacks(CustomEvalCallbacks)
+        # .callbacks(CustomEvalCallbacks)
+        .callbacks(PlotCurve)
         .evaluation(
             # We only need one evaluation worker for plotting
             evaluation_interval=1,

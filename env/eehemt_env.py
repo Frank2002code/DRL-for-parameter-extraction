@@ -818,10 +818,13 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         }
         ### New
         self.init_params["Vto"] = self.vto_values[0]  # Set default Vto
+        
+        ### New
+        INIT_PARAMS_SHIFT_FACTOR = float(os.getenv("INIT_PARAMS_SHIFT_FACTOR", 1.2))
         if self.test_modified:
             self.modified_init_params = self.init_params.copy()
             for name in self.tunable_param_names:
-                self.modified_init_params[name] *= 1.2
+                self.modified_init_params[name] *= INIT_PARAMS_SHIFT_FACTOR
             self.current_params = self.modified_init_params.copy()
         else:
             self.current_params = self.init_params.copy()
@@ -904,7 +907,7 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
 
         # === Episode Control ===
         self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
-        self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.05))
+        self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.15))
         self.current_step = 0
 
         # === Error Initialization ===
@@ -916,7 +919,7 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             os.getenv("STAGNATION_PATIENCE_STEPS", 50)
         )  # step 耐心值
         self.STAGNATION_THRESHOLD = float(
-            os.getenv("STAGNATION_THRESHOLD", 1e-6)
+            os.getenv("STAGNATION_THRESHOLD", 1e-3)
         )  # 進展的門檻
         self.stagnation_cnt = 0
 
@@ -1110,7 +1113,7 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         if terminated or truncated:
             info["final_rmspe"] = current_rmspe
             # info["final_params"] = self.current_params
-            info["plot_data"] = self._get_plot_data()
+            info["i_sim_current"] = self._get_i_sim_current()
 
         return observation, reward, terminated, truncated, info
 
@@ -1192,6 +1195,29 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             **self.modified_init_params,
         ) if self.test_modified else np.zeros_like(self.vgs)
         # Simulate Current Curve
+        # current_params_float = {k: float(v) for k, v in self.current_params.items()}
+        # i_sim_current = self.eehemt_model.functions["Ids"].eval(
+        #     temperature=self.temperature,
+        #     voltages=self.sweep_bias,
+        #     **current_params_float,
+        # )
+
+        return {
+            "vgs": self.vgs,
+            "i_meas": i_meas,
+            "i_sim_initial": i_sim_initial,
+            "i_sim_modified": i_sim_modified,
+            # "i_sim_current": i_sim_current,
+            ### New
+            "vto": first_vto,
+        }
+        
+    ### New
+    def _get_i_sim_current(self):
+        """
+        Returns only the DYNAMIC data for plotting at the end of an episode.
+        """
+        # Simulate Current Curve
         current_params_float = {k: float(v) for k, v in self.current_params.items()}
         i_sim_current = self.eehemt_model.functions["Ids"].eval(
             temperature=self.temperature,
@@ -1199,12 +1225,4 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
             **current_params_float,
         )
 
-        return {
-            "vgs": self.vgs,
-            "i_meas": i_meas,
-            "i_sim_initial": i_sim_initial,
-            "i_sim_modified": i_sim_modified,
-            "i_sim_current": i_sim_current,
-            ### New
-            "vto": first_vto,
-        }
+        return {"i_sim_current": i_sim_current}
