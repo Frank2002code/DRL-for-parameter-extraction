@@ -14,14 +14,15 @@ if __name__ == "__main__":
 
     # === Env arguments ===
     parser.add_argument(
-        "--csv_file_path",
-        type=str,
-        default="/home/u5977862/DRL-on-parameter-extraction/data/S25E02A025WS_25C_GMVG.csv",
-    )
-    parser.add_argument(
         "--va_file_path",
         type=str,
         default="/home/u5977862/DRL-on-parameter-extraction/env/eehemt/eehemt114_2.va",
+    )
+    parser.add_argument("--simulate_target_data", type=bool, default=True)
+    parser.add_argument(
+        "--csv_file_path",
+        type=str,
+        default="/home/u5977862/DRL-on-parameter-extraction/data/S25E02A025WS_25C_GMVG.csv",
     )
     parser.add_argument("--test_modified", type=bool, default=True)
 
@@ -57,9 +58,10 @@ if __name__ == "__main__":
         .environment(
             EEHEMTEnv_Norm_Vtos,
             env_config={
-                "csv_file_path": args.csv_file_path,
-                "tunable_params_config": tunable_params_config,
                 "va_file_path": args.va_file_path,
+                "tunable_params_config": tunable_params_config,
+                "simulate_target_data": args.simulate_target_data,
+                "csv_file_path": args.csv_file_path,
                 "test_modified": args.test_modified,
             },
         )

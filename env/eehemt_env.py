@@ -4,6 +4,7 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import wandb  # type: ignore[import-untyped]
 
 # Only available on Linux with python 3.11
 import verilogae  # type: ignore[import-untyped]
@@ -69,6 +70,8 @@ for name in tunable_param_names:
             f"Warning: Parameter '{name}' from environment variable not found in master config. Skipping."
         )
 ### New
+TEMPERATURE = int(os.getenv("TEMPERATURE", "300.0"))
+INIT_PARAMS_SHIFT_FACTOR = float(os.getenv("INIT_PARAMS_SHIFT_FACTOR", 1.2))
 EPSILON = 1e-9
 
 
@@ -1290,3 +1293,373 @@ class EEHEMTEnv_Norm_Vtos(gym.Env):
         )
 
         return {"i_sim_current_matrix": i_sim_current_matrix}
+    
+## New
+class EEHEMTEnv_Norm_Lgs(gym.Env):
+    """
+    A custom Gymnasium environment for optimizing EE-HEMT model parameters.
+
+    Attributes:
+        action_space (gym.spaces.Box): The space of possible actions.
+        observation_space (gym.spaces.Box): The space of possible observations.
+        ...
+    """
+
+    metadata = {"render_modes": []}
+
+    def __init__(self, config: dict) -> None:
+        """
+        Initializes the environment.
+
+        Args:
+            config (dict): A dictionary containing configuration parameters for the environment,
+                           such as file paths and parameter tuning settings.
+        """
+        super(EEHEMTEnv_Norm_Lgs, self).__init__()
+
+        self.eehemt_model = verilogae.load(config.get("va_file_path", ""))
+
+        ### New
+        self.lg_values = [
+            float(v) 
+            for v in os.getenv("LG_VALUES", "80e-9,85e-9,90e-9,95e-9,100e-9,110e-9,250e-9,500e-9,1000e-9,5000e-9,10000e-9").split(",")
+        ]
+        self.num_lgs = len(self.lg_values)
+
+        # === All Params (Including Tunable) Initialization ===
+        self.tunable_params_config = config.get("tunable_params_config", {})
+        self.tunable_param_names = list(self.tunable_params_config.keys())
+
+        self.init_params = {
+            name: param.default for name, param in self.eehemt_model.modelcard.items()
+        }
+        ### New
+        self.init_params["Lg"] = self.lg_values[0]  # Set default channel length
+
+        ### New
+        simulate_target_data = config.get("simulate_target_data", False)
+        if simulate_target_data:
+            # self.modified_init_params = self.init_params.copy()
+            target_params = self.init_params.copy()
+            for name in self.tunable_param_names:
+                self.init_params[name] *= INIT_PARAMS_SHIFT_FACTOR
+        self.current_params = self.init_params.copy()
+
+        self.current_tunable_params = np.array(
+            [self.current_params[name] for name in self.tunable_param_names],
+            dtype=np.float32,
+        )
+        self.TUNABLE_PARAMS_MIN = np.array(
+            [config["min"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )
+        self.TUNABLE_PARAMS_MAX = np.array(
+            [config["max"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )
+
+        # === Load I_meas (y_true) and sweep bias ===
+        self.csv_file_path = config.get("csv_file_path", "")
+        if not os.path.exists(self.csv_file_path):
+            raise FileNotFoundError(
+                f"Measured data file not found:: {self.csv_file_path}"
+            )
+        measured_data = pd.read_csv(self.csv_file_path)
+        self.vgs = measured_data["vg"].values
+        vds = np.full_like(self.vgs, 0.1)
+        self.sweep_bias = {
+            "br_gisi": self.vgs,
+            "br_disi": vds,
+            "br_t": self.vgs,
+            "br_esi": self.vgs,
+        }
+        if simulate_target_data:
+            self.i_meas_dict = {
+                lg: self.eehemt_model.functions["Ids"].eval(
+                    temperature=TEMPERATURE,
+                    voltages=self.sweep_bias,
+                    **(target_params | {"Lg": float(lg)}),
+                )
+                for lg in self.lg_values
+            }
+            print("\nSynthetic target data generation complete.\n")
+        else:
+            # $ 原本用真正的 csv file 的 id 做 i_meas
+            for lg in self.lg_values:
+                lg_str = f"id_{int(lg * 1e9)}"
+                if lg_str in measured_data.columns:
+                    self.i_meas_dict[lg] = measured_data[lg_str].values
+                else:
+                    print(f"Warning: Column '{lg_str}' not found in CSV file.")
+                    self.i_meas_dict[lg] = np.zeros_like(self.vgs)
+
+        # === Action Space Definition ===
+        self.action_space = Box(low=-1.0, high=1.0, dtype=np.float32)
+        self.ACTION_FACTORS = np.array(
+            [config["factor"] for config in self.tunable_params_config.values()],
+            dtype=np.float32,
+        )  # Linear transform better than independent function transform
+        self.prev_params_delta = np.zeros_like(self.current_tunable_params)
+
+        # === Observation Space Definition ===
+        # Observation space contains: [P_t, ΔP_{t-1}, E_t (raw error)]
+        param_low = [config["min"] for config in self.tunable_params_config.values()]
+        param_high = [config["max"] for config in self.tunable_params_config.values()]
+
+        prev_params_delta_low = -self.ACTION_FACTORS
+        prev_params_delta_high = self.ACTION_FACTORS
+
+        total_err_len = len(self.vgs) * self.num_lgs
+        err_vector_low = np.full(total_err_len, -np.inf)
+        err_vector_high = np.full(total_err_len, np.inf)
+
+        low_bounds = np.concatenate(
+            [param_low, prev_params_delta_low, err_vector_low]
+        ).astype(np.float32)
+        high_bounds = np.concatenate(
+            [param_high, prev_params_delta_high, err_vector_high]
+        ).astype(np.float32)
+        self.observation_space = Box(low=low_bounds, high=high_bounds, dtype=np.float32)
+
+        # === Episode Control ===
+        self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
+        self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.15))
+        self.current_step = 0
+
+        # === Error Initialization ===
+        # self.init_rmspe = -1.0
+        self.prev_rmspe = -1.0  # For reward calculation
+
+        # === Stagnation (停滯) detection settings ===
+        self.STAGNATION_PATIENCE_STEPS = int(
+            os.getenv("STAGNATION_PATIENCE_STEPS", 50)
+        )  # step 耐心值
+        self.STAGNATION_THRESHOLD = float(
+            os.getenv("STAGNATION_THRESHOLD", 1e-3)
+        )  # 進展的門檻
+        self.stagnation_cnt = 0
+
+    def _get_obs(self, concat_err_vector: np.ndarray) -> np.ndarray:
+        """
+        Constructs the observation vector for the agent.
+
+        Observation = [P_t (current params), ΔP_{t-1} (previous param change), E_t (normalized error vector)]
+
+        Returns:
+            np.ndarray: The observation vector.
+        """
+        # 1. P_t: Current tunable params vector
+
+        # 2. \Delta_P_{t-1}: Diff vector between current and previous params
+
+        # 3. E_t: Error vector between I_meas and I_sim
+
+        # 4. Combine observation vector
+        obs = np.concatenate(
+            [self.current_tunable_params, self.prev_params_delta, concat_err_vector]
+        ).astype(np.float32)
+
+        return obs
+
+    def _get_info(self, rmspe: float) -> dict:
+        """
+        Generates the info dictionary returned at each step.
+
+        Args:
+            rmspe (float): The current RMSPE value.
+
+        Returns:
+            dict: A dictionary containing auxiliary diagnostic information.
+        """
+        return {"current_rmspe": rmspe, "current_params": self.current_params.copy()}
+
+    def _transform_action(self, action: np.ndarray) -> np.ndarray:
+        """Inverse transform function: converts normalized action [-1, 1] to actual parameter changes."""
+        return action * self.ACTION_FACTORS
+
+    ### New
+    def _run_all_lg_sim(self) -> tuple[np.ndarray, np.ndarray]:
+        """
+        NEW: Helper function to run simulations for all Lg conditions.
+
+        Returns:
+            tuple[np.ndarray, np.ndarray]:
+                - A flattened numpy array containing all concatenated error vectors.
+                - A numpy array of RMSPE values for each Lg condition.
+        """
+        all_i_meas_matrix = np.array([self.i_meas_dict[lg] for lg in self.lg_values])
+
+        current_params_float = {k: float(v) for k, v in self.current_params.items()}
+        all_i_sim_matrix = np.array(
+            [
+                self.eehemt_model.functions["Ids"].eval(
+                    temperature=TEMPERATURE,
+                    voltages=self.sweep_bias,
+                    # The `|` operator merges the base parameters with the current Lg
+                    **(current_params_float | {"Lg": lg}),
+                )
+                for lg in self.lg_values
+            ]
+        )
+
+        all_err_matrix = (
+            all_i_meas_matrix - all_i_sim_matrix
+        )  # self.i_meas - all_i_sim_matrix
+
+        concat_err_vector = all_err_matrix.flatten().astype(np.float32)
+
+        # Calculate RMSPE for each I-V curve (each row).
+        rmspe_vals = np.array(
+            [
+                calculate_rmspe(i_meas_row, i_sim_row)
+                for i_meas_row, i_sim_row in zip(all_i_meas_matrix, all_i_sim_matrix)
+            ],
+            dtype=np.float32,
+        )
+
+        return concat_err_vector, rmspe_vals
+
+    def reset(self, seed: int | None = None, options: dict | None = None) -> tuple:
+        """
+        Resets the environment to its initial state for a new episode.
+
+        Args:
+            seed (int, optional): The seed for the random number generator. Defaults to None.
+            options (dict, optional): Additional options for resetting the environment. Defaults to None.
+
+        Returns:
+            tuple: A tuple containing the initial observation and info dictionary.
+        """
+        super().reset(seed=seed)
+        self.current_params = self.init_params.copy()
+        self.current_tunable_params = np.array(
+            [self.current_params[name] for name in self.tunable_param_names],
+            dtype=np.float32,
+        )
+        self.prev_params_delta = np.zeros_like(self.current_tunable_params)
+
+        self.current_step = 0
+        self.stagnation_cnt = 0
+
+        # === Run initial simulation for all Lg conditions & Calculate RMSPE ===
+        init_err_vector, init_rmspe_vals = self._run_all_lg_sim()
+        avg_init_rmspe = np.mean(init_rmspe_vals)
+        # self.init_rmspe = avg_init_rmspe
+        self.prev_rmspe = avg_init_rmspe
+
+        observation = self._get_obs(init_err_vector)
+        info = self._get_info(avg_init_rmspe)
+
+        return observation, info
+
+    def step(self, action: np.ndarray) -> tuple:
+        """
+        Executes one time step within the environment.
+
+        This involves updating the model parameters based on the agent's action,
+        simulating the I-V curve, calculating the new RMSPE, and determining the reward.
+
+        Args:
+            action (np.ndarray): The action taken by the agent.
+
+        Returns:
+            tuple: A tuple containing the new observation, reward, terminated flag,
+                   truncated flag, and info dictionary.
+        """
+        self.current_step += 1
+
+        # === Update parameters and ensure they are within defined bounds ===
+        tunable_params_delta = self.prev_params_delta = self._transform_action(action)
+        self.current_tunable_params += tunable_params_delta
+        self.current_tunable_params = np.clip(
+            self.current_tunable_params,
+            self.TUNABLE_PARAMS_MIN,
+            self.TUNABLE_PARAMS_MAX,
+        )
+        updated_tunable_part = dict(
+            zip(self.tunable_param_names, self.current_tunable_params)
+        )
+        self.current_params.update(updated_tunable_part)
+
+        # === Run simulations for all Lg conditions ===
+        current_err_vector, rmspe_vals = self._run_all_lg_sim()
+
+        # === Calculate RMSPE for reward, termination conditions, and info ===
+        current_rmspe = np.mean(rmspe_vals)
+        reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
+        reward = np.clip(reward, -1.0, 1.0)  # Normalize reward to [-1, 1]
+        self.prev_rmspe = current_rmspe
+
+        # === Get the next observation and info ===
+        observation = self._get_obs(current_err_vector)
+        info = self._get_info(current_rmspe)
+
+        # === Check Termination Conditions ===
+        terminated_success = current_rmspe < self.RMSPE_THRESHOLD
+        if abs(reward) < self.STAGNATION_THRESHOLD:
+            self.stagnation_cnt += 1
+        else:
+            self.stagnation_cnt = 0
+        terminated_stagnation = self.stagnation_cnt >= self.STAGNATION_PATIENCE_STEPS
+        terminated = terminated_success or terminated_stagnation
+        truncated = self.current_step >= self.MAX_EPISODE_STEPS
+
+        if terminated_success:
+            print(
+                f"Success! RMSPE ({current_rmspe:.4f}) has reached the threshold ({self.RMSPE_THRESHOLD})."
+            )
+        if terminated_stagnation:
+            print(
+                f"Terminated due to stagnation ({self.STAGNATION_PATIENCE_STEPS} steps with little improvement)."
+            )
+        if truncated and not terminated:
+            print("Reached maximum steps.")
+
+        if terminated or truncated:
+            info["final_rmspe"] = current_rmspe
+            info["i_sim_current_matrix"] = self._get_i_sim_current_matrix()
+
+        return observation, reward, terminated, truncated, info
+
+    def _get_plot_data_matrix(self):
+        i_sim_init_matrix = np.array([
+            self.eehemt_model.functions["Ids"].eval(
+                temperature=TEMPERATURE,
+                voltages=self.sweep_bias,
+                **(self.init_params | {"Lg": float(lg)})
+            ) for lg in self.lg_values
+        ])
+        # i_sim_modified_matrix = np.array([
+        #     self.eehemt_model.functions["Ids"].eval(
+        #         temperature=TEMPERATURE,
+        #         voltages=self.sweep_bias,
+        #         **(self.modified_init_params | {"Lg": float(lg)})
+        #     ) for lg in self.lg_values
+        # ]) if self.simulate_target_data else np.zeros((len(self.lg_values), len(self.vgs)))
+
+        return {
+            "vgs": self.vgs,
+            "i_meas_dict": self.i_meas_dict,
+            "i_sim_init_matrix": i_sim_init_matrix,
+            # "i_sim_modified_matrix": i_sim_modified_matrix,
+        }
+
+    def _get_i_sim_current_matrix(self) -> dict[str, np.ndarray]:
+        """
+        Returns the DYNAMIC data matrix for plotting at the end of an episode.
+        """
+        current_params_float = {k: float(v) for k, v in self.current_params.items()}
+        i_sim_current_matrix = np.array(
+            [
+                self.eehemt_model.functions["Ids"].eval(
+                    temperature=TEMPERATURE,
+                    voltages=self.sweep_bias,
+                    # The `|` operator merges the base parameters with the current Lg
+                    **(current_params_float | {"Lg": lg}),
+                )
+                for lg in self.lg_values
+            ]
+        )
+
+        return {"i_sim_current_matrix": i_sim_current_matrix}
+    

@@ -71,16 +71,16 @@ def plot_iv_curve(
 
 
 ### New
-def plot_all_vto_iv_curve(
-    vto_values: list,
+def plot_all_lg_iv_curve(
+    lg_values: list,
     plot_data: dict,
     plot_dir: str,
 ):
     """
-    Plots and saves individual I-V curves for each Vto condition.
+    Plots and saves individual I-V curves for each lg condition.
 
     Args:
-        vto_values (list): A list containing all Vto float values.
+        lg_values (list): A list containing all lg float values.
         plot_data (dict): A dictionary containing static plotting data,
                           such as 'vgs', 'i_meas_dict', etc.
         plot_dir (str): The directory path to save the plots.
@@ -88,34 +88,27 @@ def plot_all_vto_iv_curve(
     # Get static data from plot_data
     vgs = plot_data["vgs"]
     i_meas_dict = plot_data["i_meas_dict"]
-    i_sim_initial_matrix = plot_data["i_sim_initial_matrix"]
-    i_sim_modified_matrix = plot_data["i_sim_modified_matrix"]
+    i_sim_init_matrix = plot_data["i_sim_init_matrix"]
+    # i_sim_modified_matrix = plot_data["i_sim_modified_matrix"]
     i_sim_current_matrix = plot_data["i_sim_current_matrix"]
 
-    # Iterate through each Vto and its corresponding index
-    for i, vto in enumerate(vto_values):
-        plt.figure(figsize=(10, 7))
+    plt.figure(figsize=(12, 8))
+
+    # Iterate through each lg and its corresponding index
+    for i, lg in enumerate(lg_values):
 
         # 1. Plot the target data (Measured)
-        plt.plot(vgs, i_meas_dict[vto], "ko", label="Measured (Target)")
+        plt.plot(vgs, i_meas_dict[lg], "ko", label="Measured (Target)")
 
         # 2. Plot the simulated curve with initial parameters
         plt.plot(
             vgs,
-            i_sim_initial_matrix[i, :],  # Get the i-th row
+            i_sim_init_matrix[i, :],  # Get the i-th row
             "b--",
             label="Simulated (Initial)",
         )
 
-        # 3. Plot the simulated curve with modified initial parameters
-        plt.plot(
-            vgs,
-            i_sim_modified_matrix[i, :],  # Get the i-th row
-            "g-.",
-            label="Simulated (Modified)",
-        )
-
-        # 4. Plot the simulated curve with the agent's final parameters
+        # 3. Plot the simulated curve with the agent's final parameters
         plt.plot(
             vgs,
             i_sim_current_matrix[i, :],  # Get the i-th row
@@ -123,21 +116,23 @@ def plot_all_vto_iv_curve(
             label="Simulated (Current)",
         )
 
-        # Set the plot style
-        plt.title(f"I-V Curve Comparison (Vto = {vto:.2f})")
-        plt.xlabel("Gate Voltage (Vg) [V]")
-        plt.ylabel("Log Drain Current (Id) [A]")
-        plt.yscale("log")
-        plt.grid(True, which="both", ls="--")
-        plt.legend()
-        plt.tight_layout()
+    # Set the plot style
+        # plt.title(f"I-V Curve Comparison (lg = {lg:.2f})")
+        
+    plt.title("I-V Curve Comparison for All lg Values")
+    plt.xlabel("Gate Voltage (Vg) [V]")
+    plt.ylabel("Log Drain Current (Id) [A]")
+    plt.yscale("log")
+    plt.grid(True, which="both", ls="--", alpha=0.7)
+    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
+    plt.tight_layout()
 
-        # Generate filename based on Vto and save the plot
-        save_path = os.path.join(plot_dir, f"final_iv_curve_vto_{vto:.2f}.png")
-        plt.savefig(save_path)
+    # Save the plot
+    save_path = os.path.join(plot_dir, "final_iv_curve_all_lg.png")
+    plt.savefig(save_path)
+    plt.close()
 
-        # Close the figure to release memory, which is crucial when plotting in a loop
-        plt.close()
+    print(f"==== I-V curve plot saved in {save_path} ====")
 
 
 ### New
@@ -154,7 +149,7 @@ class PlotCurve(RLlibCallback):
             os.makedirs(self.plot_dir)
         self.plot_data = None
         ### New
-        self.vto_values = []  # Store Vto values for plotting
+        self.lg_values = []  # Store lg values for plotting
 
     def on_environment_created(
         self, *, env_runner, metrics_logger=None, env, env_context, **kwargs
@@ -162,7 +157,7 @@ class PlotCurve(RLlibCallback):
         # print(f"Wrapper env type: {type(env).__name__}")
         actual_env = env.envs[
             0
-        ].unwrapped  # type(actual_env).__name__ = EEHEMTEnv_Norm_Vtos
+        ].unwrapped  # type(actual_env).__name__ = EEHEMTEnv_Norm_Lgs
         # print(f"Actual env type: {type(actual_env).__name__}")
 
         if self.plot_data is None:
@@ -171,7 +166,7 @@ class PlotCurve(RLlibCallback):
                 # Fetch static plot data only once
                 # self.plot_data = actual_env._get_plot_data()
                 self.plot_data = actual_env._get_plot_data_matrix()
-                self.vto_values = actual_env.vto_values
+                self.lg_values = actual_env.lg_values
             else:
                 print("Warning: Environment does not have '_get_plot_data' method.")
                 self.plot_data = {}
@@ -190,15 +185,15 @@ class PlotCurve(RLlibCallback):
             self.plot_data.update(i_sim_current_matrix)  # Return None
 
             print(
-                f"\n===== Final RMSPE: {rmspe:.4f} =====\nStarting to plot {len(self.vto_values)} curves..."
+                f"\n===== Final RMSPE: {rmspe:.4f} =====\nStarting to plot {len(self.lg_values)} curves..."
             )
             # plot_iv_curve(
             #     plot_data=self.plot_data,
             #     save_path=os.path.join(self.plot_dir, "final_iv_curve.png"),
             # )
-            plot_all_vto_iv_curve(
-                vto_values=self.vto_values,
+            plot_all_lg_iv_curve(
+                lg_values=self.lg_values,
                 plot_data=self.plot_data,
                 plot_dir=self.plot_dir,
             )
-            print(f"===== All plots saved in '{self.plot_dir}' directory. =====")
+            # print(f"===== All plots saved in '{self.plot_dir}' directory. =====")

@@ -13,6 +13,7 @@ dependencies = [
     "ray[rllib]>=2.48.0",
     "torch>=2.7.1",
     "verilogae>=1.0.0",
+    "wandb>=0.21.1",
 ]
 
 [dependency-groups]
