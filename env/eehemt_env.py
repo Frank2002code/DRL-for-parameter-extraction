@@ -4,7 +4,6 @@ import gymnasium as gym
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import wandb  # type: ignore[import-untyped]
 
 # Only available on Linux with python 3.11
 import verilogae  # type: ignore[import-untyped]
@@ -28,11 +27,13 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     "Vch": {"min": 0.5, "max": 3.0, "factor": 0.02},
     # Gamma 預設值: 0.0095 。通常為一個小的正值。
     "Gamma": {"min": 0.0, "max": 0.3, "factor": 0.001},
+    
     ## === 跨導與電流增益 ===
     # Gmmax 預設值: 0.168 。範圍涵蓋了典型的RF/功率元件。
     "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.002},
     # Deltgm 預設值: 0.252 。此為跨導的修正因子。
     "Deltgm": {"min": 0.0, "max": 1.0, "factor": 0.01},
+    
     ## === 飽和區效應 ===
     # Vsat 預設值: 0.57 。決定I-V曲線膝點(knee)電壓，通常在1V上下。
     "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.01},
@@ -40,6 +41,11 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.001},
     # Peff 預設值: 1.53 。與自熱效應相關，範圍可較大。
     "Peff": {"min": 0.5, "max": 10.0, "factor": 0.05},
+    # Vdso 預設值: 3.5 。DIBL效應的參考電壓，影響飽和區行為。
+    "Vdso": {"min": 1.0, "max": 10.0, "factor": 0.1},
+    # Vba 預設值: 4.8 。與跨導飽和區的平滑度相關，對拐點形狀影響大。
+    "Vba": {"min": 0.5, "max": 10.0, "factor": 0.1},
+
     ## === 二階效應 ===
     # Alpha 預設值: 0.01 。作為轉態區的平滑化因子，通常為一小正數。
     "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.001},
@@ -47,11 +53,22 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     "Mu": {"min": 1e-7, "max": 1e-4, "factor": 1e-7},
     # Vbc 預設值: 0.95 。為崩潰電壓相關參數。
     "Vbc": {"min": 0.1, "max": 5.0, "factor": 0.05},
+    
+    ## === 漏電流相關 (次臨界區) ===
+    # Is 預設值: 5.7e-13 。閘極漏電流的飽和電流，影響次臨界區。
+    "Is": {"min": 1e-15, "max": 1e-9, "factor": 1e-15},
+    # N 預設值: 1.70 。閘極漏電流的理想因子。
+    "N": {"min": 1.0, "max": 5.0, "factor": 0.05},
+    
     ## === 寄生電阻 ===
     # Rs 預設值: 2.0 。範圍涵蓋小訊號到功率元件的典型值。
     "Rs": {"min": 0.1, "max": 10.0, "factor": 0.1},
     # Rd 預設值: 1.0 。範圍涵蓋小訊號到功率元件的典型值。
     "Rd": {"min": 0.1, "max": 10.0, "factor": 0.1},
+    # Ris 預設值: 0.3 。內部源極寄生電阻。
+    "Ris": {"min": 0.0, "max": 1.0, "factor": 0.01},
+    # Rid 預設值: 0.001 。內部汲極寄生電阻。
+    "Rid": {"min": 0.0, "max": 0.1, "factor": 0.001},
 }
 
 # Get tunable params name from environment variable
@@ -1322,22 +1339,25 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
         ### New
         self.lg_values = [
             float(v) 
-            for v in os.getenv("LG_VALUES", "80e-9,85e-9,90e-9,95e-9,100e-9,110e-9,250e-9,500e-9,1000e-9,5000e-9,10000e-9").split(",")
+            for v in os.getenv("LG_VALUES", "0.15,0.18,0.21,0.24,0.3").split(",")
         ]
         self.num_lgs = len(self.lg_values)
 
         # === All Params (Including Tunable) Initialization ===
         self.tunable_params_config = config.get("tunable_params_config", {})
+        self.change_param_names = config.get("change_param_names", "Kapa")
+        if self.change_param_names in self.tunable_params_config:
+            self.tunable_params_config.pop(self.change_param_names)
         self.tunable_param_names = list(self.tunable_params_config.keys())
 
         self.init_params = {
             name: param.default for name, param in self.eehemt_model.modelcard.items()
         }
         ### New
-        self.init_params["Lg"] = self.lg_values[0]  # Set default channel length
+        self.init_params[self.change_param_names] = self.lg_values[0]  # Set default channel length
 
         ### New
-        simulate_target_data = config.get("simulate_target_data", False)
+        simulate_target_data = config.get("simulate_target_data", True)
         if simulate_target_data:
             # self.modified_init_params = self.init_params.copy()
             target_params = self.init_params.copy()
@@ -1366,7 +1386,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
             )
         measured_data = pd.read_csv(self.csv_file_path)
         self.vgs = measured_data["vg"].values
-        vds = np.full_like(self.vgs, 0.1)
+        vds = np.full_like(self.vgs, 1.0)
         self.sweep_bias = {
             "br_gisi": self.vgs,
             "br_disi": vds,
@@ -1378,7 +1398,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
                 lg: self.eehemt_model.functions["Ids"].eval(
                     temperature=TEMPERATURE,
                     voltages=self.sweep_bias,
-                    **(target_params | {"Lg": float(lg)}),
+                    **(target_params | {self.change_param_names: float(lg)}),
                 )
                 for lg in self.lg_values
             }
@@ -1496,7 +1516,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
                     temperature=TEMPERATURE,
                     voltages=self.sweep_bias,
                     # The `|` operator merges the base parameters with the current Lg
-                    **(current_params_float | {"Lg": lg}),
+                    **(current_params_float | {self.change_param_names: lg}),
                 )
                 for lg in self.lg_values
             ]
@@ -1626,14 +1646,14 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
             self.eehemt_model.functions["Ids"].eval(
                 temperature=TEMPERATURE,
                 voltages=self.sweep_bias,
-                **(self.init_params | {"Lg": float(lg)})
+                **(self.init_params | {self.change_param_names: float(lg)})
             ) for lg in self.lg_values
         ])
         # i_sim_modified_matrix = np.array([
         #     self.eehemt_model.functions["Ids"].eval(
         #         temperature=TEMPERATURE,
         #         voltages=self.sweep_bias,
-        #         **(self.modified_init_params | {"Lg": float(lg)})
+        #         **(self.modified_init_params | {self.change_param_names: float(lg)})
         #     ) for lg in self.lg_values
         # ]) if self.simulate_target_data else np.zeros((len(self.lg_values), len(self.vgs)))
 
@@ -1655,7 +1675,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
                     temperature=TEMPERATURE,
                     voltages=self.sweep_bias,
                     # The `|` operator merges the base parameters with the current Lg
-                    **(current_params_float | {"Lg": lg}),
+                    **(current_params_float | {self.change_param_names: lg}),
                 )
                 for lg in self.lg_values
             ]

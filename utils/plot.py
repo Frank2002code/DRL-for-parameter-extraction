@@ -1,6 +1,9 @@
+from cProfile import label
+from math import log
 import os
 
 import matplotlib.pyplot as plt
+import numpy as np
 from dotenv import load_dotenv
 from ray.rllib.algorithms.callbacks import RLlibCallback
 
@@ -96,16 +99,15 @@ def plot_all_lg_iv_curve(
 
     # Iterate through each lg and its corresponding index
     for i, lg in enumerate(lg_values):
-
         # 1. Plot the target data (Measured)
-        plt.plot(vgs, i_meas_dict[lg], "ko", label="Measured (Target)")
+        plt.plot(vgs, i_meas_dict[lg], "o", label=f"Target (lg={lg})")
 
         # 2. Plot the simulated curve with initial parameters
         plt.plot(
             vgs,
             i_sim_init_matrix[i, :],  # Get the i-th row
             "b--",
-            label="Simulated (Initial)",
+            label=f"Initial (lg={lg})",
         )
 
         # 3. Plot the simulated curve with the agent's final parameters
@@ -113,23 +115,108 @@ def plot_all_lg_iv_curve(
             vgs,
             i_sim_current_matrix[i, :],  # Get the i-th row
             "r-",
-            label="Simulated (Current)",
+            label=f"Current (lg={lg})",
         )
 
     # Set the plot style
-        # plt.title(f"I-V Curve Comparison (lg = {lg:.2f})")
-        
+    # plt.title(f"I-V Curve Comparison (lg = {lg:.2f})")
+
     plt.title("I-V Curve Comparison for All lg Values")
     plt.xlabel("Gate Voltage (Vg) [V]")
     plt.ylabel("Log Drain Current (Id) [A]")
     plt.yscale("log")
     plt.grid(True, which="both", ls="--", alpha=0.7)
-    plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
-    plt.tight_layout()
-
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+    plt.tight_layout(rect=[0, 0, 0.85, 1])
     # Save the plot
     save_path = os.path.join(plot_dir, "final_iv_curve_all_lg.png")
-    plt.savefig(save_path)
+    plt.savefig(save_path, dpi=300)
+    plt.close()
+
+    print(f"==== I-V curve plot saved in {save_path} ====")
+
+
+def plot_all_lg_iv_curve_colormap(
+    lg_values: list,
+    plot_data: dict,
+    plot_dir: str,
+    log_y: bool = True,
+):
+    """
+    Plots and saves I-V curves for all lg conditions on a single graph.
+    Each curve type (Target, Initial, Current) has its own color gradient.
+
+    Args:
+        lg_values (list): A list containing all lg float values.
+        plot_data (dict): A dictionary containing static plotting data.
+        plot_dir (str): The directory path to save the plots.
+    """
+    # --- Get static data from plot_data ---
+    vgs = plot_data["vgs"]
+    i_meas_dict = plot_data["i_meas_dict"]
+    i_sim_init_matrix = plot_data["i_sim_init_matrix"]
+    i_sim_current_matrix = plot_data["i_sim_current_matrix"]
+
+    plt.figure(figsize=(12, 8))
+
+    # --- Create distinct color maps for each curve type ---
+    # We generate a list of colors for each type of curve.
+    # Using np.linspace(0.3, 1, ...) ensures colors are not too light.
+    num_curves = len(lg_values)
+    target_colors = plt.get_cmap('Blues')(np.linspace(0.3, 1, num_curves))
+    initial_colors = plt.get_cmap('Greens')(np.linspace(0.3, 1, num_curves))
+    current_colors = plt.get_cmap('Reds')(np.linspace(0.3, 1, num_curves))
+
+    # --- Iterate through each lg and plot with gradient colors ---
+    for i, lg in enumerate(lg_values):
+        label_target = "Target" if i == len(lg_values) - 1 else None
+        label_initial = "Initial" if i == len(lg_values) - 1 else None
+        label_current = "Current" if i == len(lg_values) - 1 else None
+        # 1. Plot the target data (Measured) using the 'Blues' colormap.
+        plt.plot(
+            vgs,
+            i_meas_dict[lg],
+            marker="o",  # Set marker style
+            linestyle="None",  # Do not connect the dots
+            color=target_colors[i],
+            label=label_target,  # Only label the first curve for legend
+        )
+
+        # 2. Plot the initial simulation using the 'Greens' colormap.
+        plt.plot(
+            vgs,
+            i_sim_init_matrix[i, :],
+            linestyle="--",  # Set line style to dashed
+            color=initial_colors[i],
+            label=label_initial,
+        )
+
+        # 3. Plot the current simulation using the 'Reds' colormap.
+        plt.plot(
+            vgs,
+            i_sim_current_matrix[i, :],
+            linestyle="-",  # Set line style to solid
+            color=current_colors[i],
+            label=label_current,
+        )
+
+    # --- Set the plot style and labels ---
+    plt.title("I-V Curve Comparison for All lg Values")
+    plt.xlabel("Gate Voltage (Vg) [V]")
+    if log_y:
+        plt.ylabel("Log Drain Current (Id) [A]")
+        plt.yscale("log")
+    else:
+        plt.ylabel("Drain Current (Id) [A]")
+    plt.grid(True, which="both", ls="--", alpha=0.7)
+
+    # Place legend outside the plot area to avoid covering data
+    plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # Adjust layout to make room for the legend
+
+    # --- Save the plot ---
+    save_path = os.path.join(plot_dir, "final_iv_curve_all_lg.png")
+    plt.savefig(save_path, dpi=300)
     plt.close()
 
     print(f"==== I-V curve plot saved in {save_path} ====")
@@ -162,7 +249,7 @@ class PlotCurve(RLlibCallback):
 
         if self.plot_data is None:
             print("Fetching static plot data from the environment...")
-            if hasattr(actual_env, "_get_plot_data"):
+            if hasattr(actual_env, "_get_plot_data_matrix"):
                 # Fetch static plot data only once
                 # self.plot_data = actual_env._get_plot_data()
                 self.plot_data = actual_env._get_plot_data_matrix()
@@ -185,15 +272,16 @@ class PlotCurve(RLlibCallback):
             self.plot_data.update(i_sim_current_matrix)  # Return None
 
             print(
-                f"\n===== Final RMSPE: {rmspe:.4f} =====\nStarting to plot {len(self.lg_values)} curves..."
+                f"\n===== Final RMSPE: {rmspe:.4f} =====\nStarting to plot {3 * len(self.lg_values)} curves..."
             )
             # plot_iv_curve(
             #     plot_data=self.plot_data,
             #     save_path=os.path.join(self.plot_dir, "final_iv_curve.png"),
             # )
-            plot_all_lg_iv_curve(
+            plot_all_lg_iv_curve_colormap(
                 lg_values=self.lg_values,
                 plot_data=self.plot_data,
                 plot_dir=self.plot_dir,
+                log_y=False,
             )
             # print(f"===== All plots saved in '{self.plot_dir}' directory. =====")

@@ -19,13 +19,13 @@ if __name__ == "__main__":
         default=os.getenv("VA_FILE_PATH", ""),
     )
     parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "Kapa"))
-    parser.add_argument("--simulate_target_data", action="store_false", help="Whether to simulate target data")
+    parser.add_argument("--simulate_target_data", action="store_true", help="Whether to simulate target data")
     parser.add_argument(
         "--csv_file_path",
         type=str,
         default=os.getenv("CSV_FILE_PATH", ""),
     )
-    parser.add_argument("--test_modified", action="store_true")
+    parser.add_argument("--test_modified", action="store_true", )
 
     # === Env runner arguments ===
     parser.add_argument("--num_env_runners", type=int, default=2)

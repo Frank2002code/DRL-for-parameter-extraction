@@ -92,7 +92,7 @@ module eehemt114_va (g, d, s);
     parameter real Nvd1 = 75.5             ;
     parameter real Nvd2 = 183.6            ;
     parameter real UGW_nor = 0             ;
-    parameter real Lg = 3.76492E-11        ;
+    //parameter real Lg = 3.76492E-11        ;
     //parameter real Ld = 6.8818E-12         ;
     //parameter real Ls = 2.77E-12           ;
     //parameter real Cgp = 2.03384E-14       ;
