@@ -1,5 +1,3 @@
-from cProfile import label
-from math import log
 import os
 
 import matplotlib.pyplot as plt
@@ -163,9 +161,9 @@ def plot_all_lg_iv_curve_colormap(
     # We generate a list of colors for each type of curve.
     # Using np.linspace(0.3, 1, ...) ensures colors are not too light.
     num_curves = len(lg_values)
-    target_colors = plt.get_cmap('Blues')(np.linspace(0.3, 1, num_curves))
-    initial_colors = plt.get_cmap('Greens')(np.linspace(0.3, 1, num_curves))
-    current_colors = plt.get_cmap('Reds')(np.linspace(0.3, 1, num_curves))
+    target_colors = plt.get_cmap("Blues")(np.linspace(0.3, 1, num_curves))
+    initial_colors = plt.get_cmap("Greens")(np.linspace(0.3, 1, num_curves))
+    current_colors = plt.get_cmap("Reds")(np.linspace(0.3, 1, num_curves))
 
     # --- Iterate through each lg and plot with gradient colors ---
     for i, lg in enumerate(lg_values):

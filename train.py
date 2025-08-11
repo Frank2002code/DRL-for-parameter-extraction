@@ -19,13 +19,14 @@ if __name__ == "__main__":
         default=os.getenv("VA_FILE_PATH", ""),
     )
     parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "Kapa"))
-    parser.add_argument("--simulate_target_data", action="store_false", help="Whether to simulate target data")
+    parser.add_argument("--simulate_target_data", action="store_true", help="Whether to simulate target data")
     parser.add_argument(
         "--csv_file_path",
         type=str,
         default=os.getenv("CSV_FILE_PATH", ""),
     )
     parser.add_argument("--test_modified", action="store_true")
+    parser.add_argument("--use_stagnation", action="store_true")
 
     # === Env runner arguments ===
     parser.add_argument("--num_env_runners", type=int, default=2)
@@ -34,9 +35,11 @@ if __name__ == "__main__":
     parser.add_argument("--train_batch_size_per_learner", type=int, default=4096)
     parser.add_argument("--num_epochs", type=int, default=5)
     parser.add_argument("--minibatch_size", type=int, default=512)
+    parser.add_argument("--lr", type=float, default=float(os.getenv("LR", 5e-6)))
     parser.add_argument(
         "--entropy_coeff", type=float, default=float(os.getenv("ENTROPY_COEFF", 5e-3))
     )
+    parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument(
         "--n_iterations", type=int, default=int(os.getenv("N_ITERATIONS", 100))
     )  # 100 -> 50
@@ -64,6 +67,7 @@ if __name__ == "__main__":
                 "simulate_target_data": args.simulate_target_data,
                 "csv_file_path": args.csv_file_path,
                 "test_modified": args.test_modified,
+                "use_stagnation": args.use_stagnation,
             },
         )
         .env_runners(
@@ -74,9 +78,10 @@ if __name__ == "__main__":
             train_batch_size_per_learner=args.train_batch_size_per_learner,
             num_epochs=args.num_epochs,
             minibatch_size=args.minibatch_size,
-            lr=0.00015 * num_learners,
+            lr=args.lr * num_learners,
             ### New
             entropy_coeff=args.entropy_coeff,  # type: ignore
+            grad_clip=args.grad_clip,
         )
         .rl_module()
         .learners(
