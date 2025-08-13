@@ -1356,6 +1356,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
         # === All Params (Including Tunable) Initialization ===
         self.tunable_params_config = config.get("tunable_params_config", {})
         self.change_param_names = config.get("change_param_names", "Kapa")
+        print(f"==== Using {self.change_param_names} different values: {self.lg_values} ====")
         if self.change_param_names in self.tunable_params_config:
             self.tunable_params_config.pop(self.change_param_names)
         self.tunable_param_names = list(self.tunable_params_config.keys())
@@ -1407,7 +1408,7 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
                 )
                 for lg in self.lg_values
             }
-            print("\nSynthetic target data generation complete.\n")
+            print("\n==== Synthetic target data generation complete ====\n")
         else:
             # $ 原本用真正的 csv file 的 id 做 i_meas
             for lg in self.lg_values:
@@ -1460,6 +1461,8 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
         # === Error Initialization ===
         # self.init_rmspe = -1.0
         self.prev_rmspe = -1.0  # For reward calculation
+        self.reward_norm = config.get("reward_norm", True)
+        print(f"Reward normalization is {'enabled' if self.reward_norm else 'disabled'}.")
 
         # === Stagnation (停滯) detection settings ===
         self.use_stagnation = config.get("use_stagnation", True)
@@ -1647,8 +1650,13 @@ class EEHEMTEnv_Norm_Lgs(gym.Env):
 
         # === Calculate RMSPE for reward, termination conditions, and info ===
         current_rmspe = np.mean(rmspe_vals)
-        reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
-        reward = np.clip(reward, -1.0, 1.0)  # Normalize reward to [-1, 1]
+        ### New
+        if self.reward_norm:
+            reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
+            reward = np.clip(reward, -1.5, 1.5)  # Normalize reward to [-1, 1]
+        else:
+        # Kapa Multi curves fitting 時不能使用 /prev_err，會造成分子趨近於0
+            reward = self.prev_rmspe - current_rmspe
         self.prev_rmspe = current_rmspe
 
         # === Get the next observation and info ===

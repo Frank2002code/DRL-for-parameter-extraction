@@ -2,7 +2,7 @@ import argparse
 import os
 
 import torch as th
-from ray.rllib.algorithms.ppo import PPOConfig
+from ray.rllib.algorithms.dqn import DQNConfig
 
 from env.eehemt_env import EEHEMTEnv_Norm_Lgs, tunable_params_config
 
@@ -18,14 +18,23 @@ if __name__ == "__main__":
         type=str,
         default=os.getenv("VA_FILE_PATH", ""),
     )
-    parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "Kapa"))
-    parser.add_argument("--simulate_target_data", action="store_true", help="Whether to simulate target data")
+    parser.add_argument(
+        "--change_param_names",
+        type=str,
+        default=os.getenv("CHANGE_PARAM_NAMES", "Kapa"),
+    )
+    parser.add_argument(
+        "--simulate_target_data",
+        action="store_true",
+        help="Whether to simulate target data",
+    )
     parser.add_argument(
         "--csv_file_path",
         type=str,
         default=os.getenv("CSV_FILE_PATH", ""),
     )
     parser.add_argument("--test_modified", action="store_true")
+    parser.add_argument("--reward_norm", action="store_true")
     parser.add_argument("--use_stagnation", action="store_true")
 
     # === Env runner arguments ===
@@ -54,19 +63,24 @@ if __name__ == "__main__":
         num_learners = 2
         num_gpus_per_learner = 1.0
 
+    # === Evaluation arguments ===
+    # parser.add_argument("--log_y", action="store_true")
+
     args = parser.parse_args()
 
     # === Algo Configure ===
     config = (
-        PPOConfig()
+        DQNConfig()
         .environment(
             EEHEMTEnv_Norm_Lgs,
             env_config={
                 "va_file_path": args.va_file_path,
                 "tunable_params_config": tunable_params_config,
+                "change_param_names": args.change_param_names,
                 "simulate_target_data": args.simulate_target_data,
                 "csv_file_path": args.csv_file_path,
                 "test_modified": args.test_modified,
+                "reward_norm": args.reward_norm,
                 "use_stagnation": args.use_stagnation,
             },
         )
@@ -79,11 +93,17 @@ if __name__ == "__main__":
             num_epochs=args.num_epochs,
             minibatch_size=args.minibatch_size,
             lr=args.lr * num_learners,
-            ### New
-            entropy_coeff=args.entropy_coeff,  # type: ignore
-            grad_clip=args.grad_clip,
+            replay_buffer_config={  # type: ignore
+                "type": "PrioritizedEpisodeReplayBuffer",
+                "capacity": 60000,
+                "alpha": 0.5,
+                "beta": 0.5,
+            },
+            target_network_update_freq=1,
+            noisy=True,
+            double_q=True,
+            tau=0.01,
         )
-        .rl_module()
         .learners(
             num_learners=num_learners,
             num_gpus_per_learner=num_gpus_per_learner,
@@ -108,34 +128,11 @@ if __name__ == "__main__":
         results = algo.train()
         print(f"--- Iteration: {i + 1}/{args.n_iterations} ---")
 
-    print("\n--- Training completed. ---")
-
-    # === Evaluation ===
-    # print("\n--- Running final evaluation ---")
-    # eval_results = algo.evaluate()
-    # try:
-    #     first_episode_metrics = eval_results["evaluation"]["custom_metrics_per_episode"][0]
-    #     print("\n--- Keys available in custom_metrics_per_episode ---")
-    #     print(first_episode_metrics.keys())
-    #     print("--------------------------------------------------\n")
-
-    #     final_rmspe = first_episode_metrics["final_rmspe"]
-    #     plot_data = first_episode_metrics["plot_data"]
-
-    #     print(f"Final RMSPE: {final_rmspe:.4f}")
-    #     plot_iv_curve(
-    #         plot_data=plot_data,
-    #         plot_initial=True,
-    #         plot_modified=True,
-    #         plot_current=True,
-    #         save_path="results/final_iv_curve.png"
-    #     )
-    # except (KeyError, IndexError) as e:
-    #     print(f"\nCould not extract custom metrics for plotting. Error: {e}")
-    #     pprint.pprint(eval_results)
+    print("\n==== Training completed. ====")
 
     checkpoint_dir = "/home/u5977862/DRL-on-parameter-extraction/result/ckpt"
     checkpoint_dir = algo.save_to_path(checkpoint_dir)
     print(f"\nFinal algorithm checkpoint saved to: {checkpoint_dir}")
 
-    print("\n--- Script finished. ---")
+    algo.stop()
+    print("\n==== Script finished. ====")
