@@ -71,7 +71,6 @@ def plot_iv_curve(
     plt.close()
 
 
-### New
 def plot_all_lg_iv_curve(
     lg_values: list,
     plot_data: dict,
@@ -134,6 +133,7 @@ def plot_all_lg_iv_curve(
     print(f"==== I-V curve plot saved in {save_path} ====")
 
 
+### New
 def plot_all_lg_iv_curve_colormap(
     lg_values: list,
     plot_data: dict,
@@ -236,7 +236,7 @@ class PlotCurve(DefaultCallbacks):
         super().__init__()
         self.plot_dir = os.getenv("PLOT_DIR", "result/iv-curve")
         if not os.path.exists(self.plot_dir):
-            os.makedirs(self.plot_dir)
+            os.makedirs(self.plot_dir, exist_ok=True)
         self.plot_data = None
         ### New
         self.lg_values = []  # Store lg values for plotting

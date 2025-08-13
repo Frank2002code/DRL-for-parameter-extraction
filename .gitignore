@@ -19,3 +19,5 @@ result/*
 !result/iv_curve/
 result/iv_curve/*
 !result/iv_curve/08-08-*
+
+.env

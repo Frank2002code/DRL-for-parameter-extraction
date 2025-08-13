@@ -61,7 +61,7 @@ if __name__ == "__main__":
     if th.cuda.device_count() == 4:
         num_learners = 4
         num_gpus_per_learner = 1.0
-    elif th.cuda.device_count == 2:
+    elif th.cuda.device_count() == 2:
         num_learners = 2
         num_gpus_per_learner = 1.0
 
