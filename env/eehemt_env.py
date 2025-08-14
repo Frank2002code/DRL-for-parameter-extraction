@@ -59,9 +59,9 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     "N": {"min": 1.0, "max": 5.0, "factor": 0.08},      # factor: 0.05 -> 0.08
     ## === 寄生電阻 ===
     # Rs 預設值: 2.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rs": {"min": 0.1, "max": 10.0, "factor": 0.2},       # factor: 0.1 -> 0.2
+    "Rs": {"min": 0.2, "max": 5.0, "factor": 0.1},       # factor: 0.1 -> 0.2
     # Rd 預設值: 1.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rd": {"min": 0.1, "max": 10.0, "factor": 0.2},       # factor: 0.1 -> 0.2
+    "Rd": {"min": 0.1, "max": 5.0, "factor": 0.1},       # factor: 0.1 -> 0.2
     # Ris 預設值: 0.3 。內部源極寄生電阻。
     "Ris": {"min": 0.0, "max": 1.0, "factor": 0.02},      # factor: 0.01 -> 0.02
     # Rid 預設值: 0.001 。內部汲極寄生電阻。
@@ -83,7 +83,7 @@ for name in tunable_params_names:
         )
 CHANGE_PARAM_NAMES = os.getenv("CHANGE_PARAM_NAMES", "UGW,NOF").split(",")
 INIT_PARAMS_SHIFT_FACTOR = float(os.getenv("INIT_PARAMS_SHIFT_FACTOR", 1.2))
-TEMPERATURE = int(os.getenv("TEMPERATURE", "300.0"))
+TEMPERATURE = int(os.getenv("TEMPERATURE", 300))
 VDS = float(os.getenv("VDS", 0.1))
 EPSILON = 1e-9
 
@@ -1881,7 +1881,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
 
         # === Episode Control ===
         self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
-        self.REWARD_THRESHOLD = 100.0
+        self.REWARD_THRESHOLD = float(os.getenv("REWARD_THRESHOLD", 100.0))
         self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.15))
         self.current_step = 0
 
@@ -1937,6 +1937,9 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
             )
         else:
             err_features = concat_err_vector
+        if np.any(np.isnan(err_features)) or np.any(np.isinf(err_features)):
+            print("Warning: NaN or Inf detected in error vector, cleaning it.")
+            err_features = np.nan_to_num(err_features, nan=0.0, posinf=1e9, neginf=-1e9)
 
         # 4. Combine observation vector
         obs = np.concatenate(
@@ -2113,7 +2116,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
             print("Reached maximum steps.")
 
         if terminated or truncated:
-            info["rmspe"] = current_rmspe
+            # info["rmspe"] = current_rmspe
             info["i_sim_current_matrix"] = self._get_i_sim_current_matrix()
 
         return observation, reward, terminated, truncated, info

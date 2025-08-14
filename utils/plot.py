@@ -330,13 +330,13 @@ class PlotCurve(DefaultCallbacks):
     ) -> None:
         last_info = episode.infos[-1]
         if "i_sim_current_matrix" in last_info:
-            rmspe = last_info["rmspe"]
+            current_rmspe = last_info["current_rmspe"]
             i_sim_current_matrix = last_info["i_sim_current_matrix"]
             self.plot_data.update(i_sim_current_matrix)  # type: ignore
             # Return None
 
             print(
-                f"\nFinal RMSPE: {rmspe:.4f}\nStarting to plot {6 * len(self.ugw_n_values)} curves..."
+                f"\nFinal RMSPE: {current_rmspe:.4f}\nStarting to plot {6 * len(self.ugw_n_values)} curves..."
             )
 
             plot_all_ugw_n_iv_curve_colormap(
