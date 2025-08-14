@@ -6,7 +6,7 @@ from ray.rllib.algorithms.ppo import PPOConfig
 from ray import tune
 from ray.air.integrations.wandb import WandbLoggerCallback
 
-from env.eehemt_env import EEHEMTEnv_Norm_Lgs, tunable_params_config
+from env.eehemt_env import EEHEMTEnv_Norm_Ugw_N
 
 # from utils.callbacks import CustomEvalCallbacks
 from utils.plot import PlotCurve
@@ -20,16 +20,17 @@ if __name__ == "__main__":
         type=str,
         default=os.getenv("VA_FILE_PATH", ""),
     )
-    parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "Kapa"))
+    # parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "UGW,NOF"))
     parser.add_argument("--simulate_target_data", action="store_true", help="Whether to simulate target data")
-    parser.add_argument(
-        "--csv_file_path",
-        type=str,
-        default=os.getenv("CSV_FILE_PATH", ""),
-    )
-    parser.add_argument("--test_modified", action="store_true")
+    # parser.add_argument(
+    #     "--csv_file_path",
+    #     type=str,
+    #     default=os.getenv("CSV_FILE_PATH", ""),
+    # )
+    # parser.add_argument("--test_modified", action="store_true")
     parser.add_argument("--reward_norm", action="store_true")
     parser.add_argument("--use_stagnation", action="store_true")
+    parser.add_argument("--reduce_obs_err_dim", action="store_true")
 
     # === Env runner arguments ===
     parser.add_argument("--num_env_runners", type=int, default=int(os.getenv("NUM_ENV_RUNNERS", 4)))
@@ -67,14 +68,15 @@ if __name__ == "__main__":
     config = (
         PPOConfig()
         .environment(
-            EEHEMTEnv_Norm_Lgs,
+            EEHEMTEnv_Norm_Ugw_N,
             env_config={
                 "va_file_path": args.va_file_path,
-                "tunable_params_config": tunable_params_config,
-                "change_param_names": args.change_param_names,
+                # "tunable_params_config": tunable_params_config,
+                # "change_param_names": args.change_param_names,
                 "simulate_target_data": args.simulate_target_data,
-                "csv_file_path": args.csv_file_path,
-                "test_modified": args.test_modified,
+                # "csv_file_path": args.csv_file_path,
+                # "test_modified": args.test_modified,
+                "reduce_obs_err_dim": args.reduce_obs_err_dim,
                 "reward_norm": args.reward_norm,
                 "use_stagnation": args.use_stagnation,
             },
@@ -97,7 +99,9 @@ if __name__ == "__main__":
             num_gpus_per_learner=num_gpus_per_learner,
         )
         # .callbacks(CustomEvalCallbacks)
-        .callbacks(PlotCurve)
+        .callbacks(
+            callbacks_class=PlotCurve,
+        )
         .evaluation(
             # We only need one evaluation worker for plotting
             evaluation_interval=1,
@@ -109,10 +113,11 @@ if __name__ == "__main__":
         )
     )
 
-    tune_config = tune.TuneConfig(
-        metric="episode_reward_mean",
-        mode="max",
-    )
+    # tune_config = tune.TuneConfig(
+        # metric="episode_reward_mean",
+        # mode="max",
+    #     reuse_actors=True,
+    # )
     
     stopping_criteria = {"training_iteration": args.n_iterations, "env_runners/episode_reward_mean": args.episode_reward_mean}
     run_config = tune.RunConfig(
@@ -121,6 +126,7 @@ if __name__ == "__main__":
             WandbLoggerCallback(
                 project="PPO_for_multi_I-V_curves_fitting_in_EEHEMT",
                 api_key=os.getenv("WANDB_API_KEY", default=""),
+                log_config=True,
             )
         ]
     )
