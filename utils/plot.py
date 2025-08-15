@@ -370,6 +370,6 @@ class PlotCurve(DefaultCallbacks):
             metrics_logger.log_value(
                 log_key,
                 avg_param_value,
-                reduce=None,
+                reduce="mean",
             )
         return

@@ -61,6 +61,8 @@ if __name__ == "__main__":
         
     # === Evaluation arguments ===
     # parser.add_argument("--log_y", action="store_true")
+    parser.add_argument("--evaluation_interval", type=int, default=int(os.getenv("EVALUATION_INTERVAL", 2)))
+    parser.add_argument("--evaluation_num_env_runners", type=int, default=int(os.getenv("EVALUATION_NUM_ENV_RUNNERS", 1)))
 
     args = parser.parse_args()
 
@@ -104,8 +106,8 @@ if __name__ == "__main__":
         )
         .evaluation(
             # We only need one evaluation worker for plotting
-            evaluation_interval=1,
-            evaluation_num_env_runners=1,
+            evaluation_interval=args.evaluation_interval,
+            evaluation_num_env_runners=args.evaluation_num_env_runners,
             evaluation_duration=1,  # Only one episode for evaluation
             evaluation_duration_unit="episodes",
             # custom_evaluation_function=eval_func,
@@ -119,14 +121,23 @@ if __name__ == "__main__":
     #     reuse_actors=True,
     # )
     
-    stopping_criteria = {"training_iteration": args.n_iterations, "env_runners/episode_reward_mean": args.episode_reward_mean}
+    checkpoint_dir = os.getenv("CHECKPOINT_DIR", "")
+    stopping_criteria = {"training_iteration": args.n_iterations}
+    ckpt_config = tune.CheckpointConfig(
+        num_to_keep=5,
+        checkpoint_score_attribute="episode_reward_mean",
+        checkpoint_score_order="max",
+    )
     run_config = tune.RunConfig(
+        name="EEHEMT_PPO",
+        storage_path=checkpoint_dir,
         stop=stopping_criteria,
+        checkpoint_config=ckpt_config,
         callbacks=[
             WandbLoggerCallback(
                 project="PPO_for_multi_I-V_curves_fitting_in_EEHEMT",
                 api_key=os.getenv("WANDB_API_KEY", default=""),
-                log_config=True,
+                # log_config=True,
             )
         ]
     )
@@ -137,7 +148,7 @@ if __name__ == "__main__":
         run_config=run_config,
     )
     results = tuner.fit()
-    print("\n--- Training completed. ---")
-    
-    # === Final evaluation ===
-    print("\n--- Script finished. ---")
+    print("\n==== Training completed. ====")
+
+    # === Save model ===
+    print(f"\n==== Final algorithm checkpoint saved to: {checkpoint_dir} ====")

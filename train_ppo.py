@@ -137,7 +137,7 @@ if __name__ == "__main__":
     #     print(f"\nCould not extract custom metrics for plotting. Error: {e}")
     #     pprint.pprint(eval_results)
 
-    checkpoint_dir = "/home/u5977862/DRL-on-parameter-extraction/result/ppo/ckpt"
+    checkpoint_dir = "/home/u5977862/DRL-on-parameter-extraction/result/ckpt/ppo"
     checkpoint_dir = algo.save_to_path(checkpoint_dir)
     print(f"\nFinal algorithm checkpoint saved to: {checkpoint_dir}")
 

@@ -18,54 +18,54 @@ load_dotenv()
 ALL_POSSIBLE_TUNABLE_PARAMS = {
     ## === 臨界電壓相關 ===
     # Vto 預設值: 0.258 。範圍設定涵蓋增強型(E-mode)與空乏型(D-mode)HEMT。
-    "Vto": {"min": -1.0, "max": 1.5, "factor": 0.05},      # factor: 0.01 -> 0.05
+    "Vto": {"min": -1.0, "max": 1.5, "factor": 0.01},
     # Vtso 預設值: 0.358 。為飽和區的臨界電壓參數。
-    "Vtso": {"min": 0.0, "max": 1.5, "factor": 0.03},     # factor: 0.01 -> 0.03
+    # "Vtso": {"min": 0.0, "max": 1.5, "factor": 0.01},
     # Vgo 預設值: 0.618 。為跨導模型中的閘極電壓參數。
-    "Vgo": {"min": 0.0, "max": 1.5, "factor": 0.03},      # factor: 0.01 -> 0.03
+    "Vgo": {"min": 0.0, "max": 1.5, "factor": 0.01},
     # Vco 預設值: 0.75 。為輸出電導模型中的交叉電壓。
-    "Vco": {"min": 0.0, "max": 2.0, "factor": 0.04},      # factor: 0.01 -> 0.04
+    # "Vco": {"min": 0.0, "max": 2.0, "factor": 0.01},
     # Vch 預設值: 1.4 。此為影響臨界電壓的參數之一。
-    "Vch": {"min": 0.5, "max": 3.0, "factor": 0.05},      # factor: 0.02 -> 0.05
+    # "Vch": {"min": 0.5, "max": 3.0, "factor": 0.02},
     # Gamma 預設值: 0.0095 。通常為一個小的正值。
-    "Gamma": {"min": 0.0, "max": 0.3, "factor": 0.006},    # factor: 0.001 -> 0.006
+    # "Gamma": {"min": 0.0, "max": 0.3, "factor": 0.001},
     ## === 跨導與電流增益 ===
     # Gmmax 預設值: 0.168 。範圍涵蓋了典型的RF/功率元件。
-    "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.009},   # factor: 0.002 -> 0.009
+    "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.002},
     # Deltgm 預設值: 0.252 。此為跨導的修正因子。
-    "Deltgm": {"min": 0.0, "max": 1.0, "factor": 0.02},     # factor: 0.01 -> 0.02
+    # "Deltgm": {"min": 0.0, "max": 1.0, "factor": 0.01},
     ## === 飽和區效應 ===
     # Vsat 預設值: 0.57 。決定I-V曲線膝點(knee)電壓，通常在1V上下。
-    "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.04},      # factor: 0.01 -> 0.04
+    "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.01},
     # Kapa 預設值: 0.069 。功能同通道長度調變 Lambda，值通常較小。
-    "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.006},    # factor: 0.001 -> 0.006
+    "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.001},
     # Peff 預設值: 1.53 。與自熱效應相關，範圍可較大。
-    "Peff": {"min": 0.5, "max": 10.0, "factor": 0.19},     # factor: 0.05 -> 0.19
+    "Peff": {"min": 0.5, "max": 10.0, "factor": 0.05},
     # Vdso 預設值: 3.5 。DIBL效應的參考電壓，影響飽和區行為。
-    "Vdso": {"min": 1.0, "max": 10.0, "factor": 0.18},     # factor: 0.1 -> 0.18
+    # "Vdso": {"min": 1.0, "max": 10.0, "factor": 0.1},
     # Vba 預設值: 4.8 。與跨導飽和區的平滑度相關，對拐點形狀影響大。
-    "Vba": {"min": 0.5, "max": 10.0, "factor": 0.19},      # factor: 0.1 -> 0.19
+    # "Vba": {"min": 0.5, "max": 10.0, "factor": 0.1},
     ## === 二階效應 ===
     # Alpha 預設值: 0.01 。作為轉態區的平滑化因子，通常為一小正數。
-    "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.004},  # factor: 0.001 -> 0.004
+    "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.001},
     # Mu 預設值: 7.86e-6 。為遷移率退化係數。
-    "Mu": {"min": 1e-7, "max": 1e-4, "factor": 2e-6},      # factor: 1e-7 -> 2e-6
+    # "Mu": {"min": 1e-7, "max": 1e-4, "factor": 1e-7},
     # Vbc 預設值: 0.95 。為崩潰電壓相關參數。
-    "Vbc": {"min": 0.1, "max": 5.0, "factor": 0.1},       # factor: 0.05 -> 0.1
+    "Vbc": {"min": 0.1, "max": 5.0, "factor": 0.05},
     ## === 漏電流相關 (次臨界區) ===
     # Is 預設值: 5.7e-13 。閘極漏電流的飽和電流，影響次臨界區。
-    "Is": {"min": 1e-15, "max": 1e-9, "factor": 2e-11},    # factor: 1e-15 -> 2e-11
+    # "Is": {"min": 1e-15, "max": 1e-9, "factor": 1e-15},
     # N 預設值: 1.70 。閘極漏電流的理想因子。
-    "N": {"min": 1.0, "max": 5.0, "factor": 0.08},      # factor: 0.05 -> 0.08
+    # "N": {"min": 1.0, "max": 5.0, "factor": 0.05},
     ## === 寄生電阻 ===
     # Rs 預設值: 2.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rs": {"min": 0.2, "max": 5.0, "factor": 0.1},       # factor: 0.1 -> 0.2
+    "Rs": {"min": 0.1, "max": 10.0, "factor": 0.1},
     # Rd 預設值: 1.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rd": {"min": 0.1, "max": 5.0, "factor": 0.1},       # factor: 0.1 -> 0.2
+    "Rd": {"min": 0.1, "max": 5.0, "factor": 0.1},
     # Ris 預設值: 0.3 。內部源極寄生電阻。
-    "Ris": {"min": 0.0, "max": 1.0, "factor": 0.02},      # factor: 0.01 -> 0.02
+    # "Ris": {"min": 0.0, "max": 1.0, "factor": 0.01},
     # Rid 預設值: 0.001 。內部汲極寄生電阻。
-    "Rid": {"min": 0.0, "max": 0.1, "factor": 0.002},    # factor: 0.001 -> 0.002
+    # "Rid": {"min": 0.0, "max": 0.1, "factor": 0.001},
 }
 
 # Get tunable params name from environment variable
@@ -1816,7 +1816,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
 
         # === Load I_meas (y_true) and sweep bias ===
         if simulate_target_data:
-            self.vgs = np.linspace(start=-0.3, stop=1.2, num=62)
+            self.vgs = np.arange(-0.3, 1.2+0.001, 0.025)
         else:
             self.csv_file_path = config.get("csv_file_path", "")
             if not os.path.exists(self.csv_file_path):
@@ -1852,7 +1852,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
             [config["factor"] for config in tunable_params_config.values()],
             dtype=np.float32,
         )  # Linear transform better than independent function transform
-        self.prev_params_delta = {name: 0.0 for name in tunable_params_names}
+        self.prev_params_delta = {name: EPSILON for name in tunable_params_names}
 
         # === Observation Space Definition ===
         # Observation space contains: [P_t, ΔP_{t-1}, E_t (error vector feature)]
@@ -1881,7 +1881,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
 
         # === Episode Control ===
         self.MAX_EPISODE_STEPS = int(os.getenv("MAX_EPISODE_STEPS", 1000))
-        self.REWARD_THRESHOLD = float(os.getenv("REWARD_THRESHOLD", 100.0))
+        self.REWARD_NORM_THRESHOLD = float(os.getenv("REWARD_NORM_THRESHOLD", 100.0))
         self.RMSPE_THRESHOLD = float(os.getenv("RMSPE_THRESHOLD", 0.15))
         self.current_step = 0
 
@@ -1937,14 +1937,14 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
             )
         else:
             err_features = concat_err_vector
-        if np.any(np.isnan(err_features)) or np.any(np.isinf(err_features)):
-            print("Warning: NaN or Inf detected in error vector, cleaning it.")
-            err_features = np.nan_to_num(err_features, nan=0.0, posinf=1e9, neginf=-1e9)
 
         # 4. Combine observation vector
         obs = np.concatenate(
             [current_tunable_values, prev_params_delta, err_features]
         ).astype(np.float32)
+        # if np.any(np.isnan(obs)) or np.any(np.isinf(obs)):
+        #     print("Warning: NaN or Inf detected in obs, cleaning it.")
+        #     obs = np.nan_to_num(obs, nan=0.0, posinf=1e5, neginf=-1e5)
 
         return obs
 
@@ -1981,18 +1981,32 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
         )
 
         current_params_float = {k: float(v) for k, v in self.current_params.items()}
-        all_i_sim_matrix = np.array(
-            [
-                self.eehemt_model.functions["Ids"].eval(
-                    temperature=TEMPERATURE,
-                    voltages=self.sweep_bias,
-                    **(
-                        current_params_float | dict(zip(self.change_param_names, ugw_n))
-                    ),
-                )
-                for ugw_n in self.ugw_n_values
-            ]
-        )
+        # all_i_sim_matrix = np.array(
+        #     [
+        #         self.eehemt_model.functions["Ids"].eval(
+        #             temperature=TEMPERATURE,
+        #             voltages=self.sweep_bias,
+        #             **(
+        #                 current_params_float | dict(zip(self.change_param_names, ugw_n))
+        #             ),
+        #         )
+        #         for ugw_n in self.ugw_n_values
+        #     ]
+        # )
+        i_sim_results = []
+        for ugw_n in self.ugw_n_values:
+            i_sim_single_curve = self.eehemt_model.functions["Ids"].eval(
+                temperature=TEMPERATURE,
+                voltages=self.sweep_bias,
+                **(current_params_float | dict(zip(self.change_param_names, ugw_n))),
+            )
+
+            if np.any(np.isnan(i_sim_single_curve)) or np.any(np.isinf(i_sim_single_curve)):
+                print(f"\n==== Warning: NaN or Inf detected in simulation for parameters {ugw_n}, cleaning it. ====\n")
+                i_sim_single_curve = np.nan_to_num(i_sim_single_curve, nan=0.0, posinf=1e5, neginf=-1e5)
+                
+            i_sim_results.append(i_sim_single_curve)
+        all_i_sim_matrix = np.array(i_sim_results)
 
         all_err_matrix = (
             all_i_meas_matrix - all_i_sim_matrix
@@ -2029,7 +2043,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
         #     dtype=np.float32,
         # )
         # self.prev_params_delta = np.zeros_like(self.current_tunable_params)
-        self.prev_params_delta = {name: 0.0 for name in tunable_params_names}
+        self.prev_params_delta = {name: EPSILON for name in tunable_params_names}
 
         self.current_step = 0
         self.stagnation_cnt = 0
@@ -2080,7 +2094,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
         current_rmspe = np.mean(rmspe_vals)  # Kapa Multi curves fitting 時不能使用 /prev_err，會造成分子趨近於0
         ### New
         reward = self.prev_rmspe - current_rmspe
-        if self.reward_norm and abs(reward) > self.REWARD_THRESHOLD:
+        if self.reward_norm and abs(reward) < self.REWARD_NORM_THRESHOLD:
             reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
             # reward = np.clip(reward, -1.5, 1.5)  # Normalize reward to [-1, 1]
         self.prev_rmspe = current_rmspe
