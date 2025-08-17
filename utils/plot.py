@@ -139,6 +139,7 @@ def plot_all_ugw_n_iv_curve_colormap(
     plot_data: dict,
     plot_dir: str,
     log_y: bool = True,
+    plot_cnt: int = 0,
 ):
     """
     Plots and saves I-V curves for all (Ugw, NOF) conditions on a single graph.
@@ -206,12 +207,12 @@ def plot_all_ugw_n_iv_curve_colormap(
         ax.set_ylabel("Log Drain Current (Id) [A]")
         ax.set_yscale("log")
         save_path = os.path.join(
-            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_log.png"
+            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_log_{plot_cnt}.png"
         )
     else:
         ax.set_ylabel("Drain Current (Id) [A]")
         save_path = os.path.join(
-            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}.png"
+            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_{plot_cnt}.png"
         )
     plt.grid(True, which="both", ls="--", alpha=0.7)
 
@@ -240,6 +241,7 @@ class PlotCurve(DefaultCallbacks):
         self.plot_data = None
         ### New
         self.ugw_n_values = []  # Store lg values for plotting
+        self.plot_cnt = 0
 
     def on_environment_created(
         self, *, env_runner, metrics_logger=None, env, env_context, **kwargs
@@ -329,6 +331,7 @@ class PlotCurve(DefaultCallbacks):
         **kwargs,
     ) -> None:
         last_info = episode.infos[-1]
+        self.plot_cnt += 1
         if "i_sim_current_matrix" in last_info:
             current_rmspe = last_info["current_rmspe"]
             i_sim_current_matrix = last_info["i_sim_current_matrix"]
@@ -345,12 +348,14 @@ class PlotCurve(DefaultCallbacks):
                 plot_dir=self.plot_dir,
                 # log_y=os.getenv("LOG_Y", "True").lower() == "true",
                 log_y=False,
+                plot_cnt=self.plot_cnt // 2,
             )
             plot_all_ugw_n_iv_curve_colormap(
                 ugw_n_values=self.ugw_n_values,
                 plot_data=self.plot_data,
                 plot_dir=self.plot_dir,
                 log_y=True,
+                plot_cnt=self.plot_cnt // 2,
             )
         ### New
         # vto = episode.custom_data["Vto"]
