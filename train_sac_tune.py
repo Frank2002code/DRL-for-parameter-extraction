@@ -2,9 +2,9 @@ import argparse
 import os
 
 import torch as th
-from ray.rllib.algorithms.sac import SACConfig
 from ray import tune
 from ray.air.integrations.wandb import WandbLoggerCallback
+from ray.rllib.algorithms.sac import SACConfig
 
 from env.eehemt_env import EEHEMTEnv_Norm_Ugw_N
 
@@ -21,7 +21,11 @@ if __name__ == "__main__":
         default=os.getenv("VA_FILE_PATH", ""),
     )
     # parser.add_argument("--change_param_names", type=str, default=os.getenv("CHANGE_PARAM_NAMES", "UGW,NOF"))
-    parser.add_argument("--simulate_target_data", action="store_true", help="Whether to simulate target data")
+    parser.add_argument(
+        "--simulate_target_data",
+        action="store_true",
+        help="Whether to simulate target data",
+    )
     # parser.add_argument(
     #     "--csv_file_path",
     #     type=str,
@@ -33,21 +37,42 @@ if __name__ == "__main__":
     parser.add_argument("--reduce_obs_err_dim", action="store_true")
 
     # === Env runner arguments ===
-    parser.add_argument("--num_env_runners", type=int, default=int(os.getenv("NUM_ENV_RUNNERS", 4)))
+    parser.add_argument(
+        "--num_env_runners", type=int, default=int(os.getenv("NUM_ENV_RUNNERS", 4))
+    )
 
     # === Training arguments ===
-    parser.add_argument("--train_batch_size_per_learner", type=int, default=int(os.getenv("TRAIN_BATCH_SIZE_PER_LEARNER", 4096)))
-    parser.add_argument("--num_epochs", type=int, default=int(os.getenv("NUM_EPOCHS", 5)))  # 從 env 收集到的資料重複使用多少次來進行 model 更新
-    parser.add_argument("--minibatch_size", type=int, default=int(os.getenv("MINIBATCH_SIZE", 512)))
-    parser.add_argument("--actor_lr", type=float, default=float(os.getenv("ACTOR_LR", 3e-5)))
-    parser.add_argument("--critic_lr", type=float, default=float(os.getenv("CRITIC_LR", 3e-4)))
+    parser.add_argument(
+        "--train_batch_size_per_learner",
+        type=int,
+        default=int(os.getenv("TRAIN_BATCH_SIZE_PER_LEARNER", 4096)),
+    )
+    parser.add_argument(
+        "--num_epochs", type=int, default=int(os.getenv("NUM_EPOCHS", 5))
+    )  # 從 env 收集到的資料重複使用多少次來進行 model 更新
+    parser.add_argument(
+        "--minibatch_size", type=int, default=int(os.getenv("MINIBATCH_SIZE", 512))
+    )
+    parser.add_argument(
+        "--actor_lr", type=float, default=float(os.getenv("ACTOR_LR", 3e-5))
+    )
+    parser.add_argument(
+        "--critic_lr", type=float, default=float(os.getenv("CRITIC_LR", 3e-4))
+    )
     parser.add_argument("--grad_clip", type=float, default=1.0)
     parser.add_argument(
         "--n_iterations", type=int, default=int(os.getenv("N_ITERATIONS", 100))
     )  # 100 -> 50, 幾個 sample-train period
     parser.add_argument(
-        "--episode_reward_mean", type=float, default=float(os.getenv("EPISODE_REWARD_MEAN", 5.0))
+        "--episode_reward_mean",
+        type=float,
+        default=float(os.getenv("EPISODE_REWARD_MEAN", 5.0)),
     )  # The mean reward to stop training
+    parser.add_argument(
+        "--num_steps_sampled_before_learning_starts",
+        type=int,
+        default=int(os.getenv("NUM_STEPS_SAMPLED_BEFORE_LEARNING_STARTS", 1500)),
+    )
 
     # === Learner arguments ===
     if th.cuda.device_count() == 4:
@@ -56,13 +81,22 @@ if __name__ == "__main__":
     elif th.cuda.device_count() == 2:
         num_learners = 2
         num_gpus_per_learner = 1.0
-        
+
     # === Evaluation arguments ===
     # parser.add_argument("--log_y", action="store_true")
-    parser.add_argument("--evaluation_interval", type=int, default=int(os.getenv("EVALUATION_INTERVAL", 2)))
-    parser.add_argument("--evaluation_num_env_runners", type=int, default=int(os.getenv("EVALUATION_NUM_ENV_RUNNERS", 1)))
+    parser.add_argument(
+        "--evaluation_interval",
+        type=int,
+        default=int(os.getenv("EVALUATION_INTERVAL", 2)),
+    )
+    parser.add_argument(
+        "--evaluation_num_env_runners",
+        type=int,
+        default=int(os.getenv("EVALUATION_NUM_ENV_RUNNERS", 1)),
+    )
 
     args = parser.parse_args()
+    min_learning_starts = args.train_batch_size_per_learner * num_learners
 
     # === Algo Configure ===
     config = (
@@ -85,9 +119,13 @@ if __name__ == "__main__":
             train_batch_size_per_learner=args.train_batch_size_per_learner,
             num_epochs=args.num_epochs,
             minibatch_size=args.minibatch_size,
-            actor_lr = args.actor_lr * num_learners,  # type: ignore
-            critic_lr = args.critic_lr * num_learners,
+            actor_lr=args.actor_lr * num_learners,  # type: ignore
+            critic_lr=args.critic_lr * num_learners,
             grad_clip=args.grad_clip,
+            ### New
+            num_steps_sampled_before_learning_starts=min(
+                min_learning_starts, args.num_steps_sampled_before_learning_starts
+            ),
         )
         .learners(
             num_learners=num_learners,
@@ -108,11 +146,11 @@ if __name__ == "__main__":
     )
 
     # tune_config = tune.TuneConfig(
-        # metric="episode_reward_mean",
-        # mode="max",
+    # metric="episode_reward_mean",
+    # mode="max",
     #     reuse_actors=True,
     # )
-    
+
     checkpoint_dir = os.getenv("CHECKPOINT_DIR", "")
     stopping_criteria = {"training_iteration": args.n_iterations}
     ckpt_config = tune.CheckpointConfig(
@@ -131,7 +169,7 @@ if __name__ == "__main__":
                 api_key=os.getenv("WANDB_API_KEY", default=""),
                 # log_config=True,
             )
-        ]
+        ],
     )
 
     tuner = tune.Tuner(
