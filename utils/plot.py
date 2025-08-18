@@ -153,7 +153,7 @@ def plot_all_ugw_n_iv_curve_colormap(
     # === Get static data from plot_data ===
     vgs = plot_data["vgs"]
     i_meas_dict = plot_data["i_meas_dict"]
-    i_sim_init_matrix = plot_data["i_sim_init_matrix"]
+    # i_sim_init_matrix = plot_data["i_sim_init_matrix"]
     i_sim_current_matrix = plot_data["i_sim_current_matrix"]
 
     fig, ax = plt.subplots(figsize=(10, 7))
@@ -163,14 +163,14 @@ def plot_all_ugw_n_iv_curve_colormap(
     # Using np.linspace(0.5, 1, ...) ensures colors are not too light.
     num_curves = len(ugw_n_values)
     target_colors = plt.get_cmap("Blues")(np.linspace(0.5, 1, num_curves))
-    initial_colors = plt.get_cmap("Greens")(np.linspace(0.5, 1, num_curves))
+    # initial_colors = plt.get_cmap("Greens")(np.linspace(0.5, 1, num_curves))
     current_colors = plt.get_cmap("Reds")(np.linspace(0.5, 1, num_curves))
 
     # === Iterate through each (Ugw, NOF) pair and plot with gradient colors ===
     for i, ugw_n in enumerate(ugw_n_values):
         label_target = "Target" if i == len(ugw_n_values) - 1 else None
-        label_initial = "Initial" if i == len(ugw_n_values) - 1 else None
-        label_current = "Final" if i == len(ugw_n_values) - 1 else None
+        # label_initial = "Initial" if i == len(ugw_n_values) - 1 else None
+        label_current = "PPO" if i == len(ugw_n_values) - 1 else None
         # 1. Plot the target data (Measured) using the 'Blues' colormap.
         ax.plot(
             vgs,
@@ -183,13 +183,13 @@ def plot_all_ugw_n_iv_curve_colormap(
         )
 
         # 2. Plot the initial simulation using the 'Greens' colormap.
-        ax.plot(
-            vgs,
-            i_sim_init_matrix[i, :],
-            linestyle="--",  # Set line style to dashed
-            color=initial_colors[i],
-            label=label_initial,
-        )
+        # ax.plot(
+        #     vgs,
+        #     i_sim_init_matrix[i, :],
+        #     linestyle="--",  # Set line style to dashed
+        #     color=initial_colors[i],
+        #     label=label_initial,
+        # )
 
         # 3. Plot the current simulation using the 'Reds' colormap.
         ax.plot(
@@ -207,14 +207,13 @@ def plot_all_ugw_n_iv_curve_colormap(
         ax.set_ylabel("Log Drain Current (Id) [A]")
         ax.set_yscale("log")
         save_path = os.path.join(
-            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_log_{plot_cnt}.png"
+            plot_dir, f"iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_log_{plot_cnt}.png"
         )
     else:
         ax.set_ylabel("Drain Current (Id) [A]")
         save_path = os.path.join(
-            plot_dir, f"final_iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_{plot_cnt}.png"
+            plot_dir, f"iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_{plot_cnt}.png"
         )
-    plt.grid(True, which="both", ls="--", alpha=0.7)
 
     ax.grid(True, which="both", ls="--", alpha=0.7)
     ax.legend(loc="best")
@@ -348,14 +347,14 @@ class PlotCurve(DefaultCallbacks):
                 plot_dir=self.plot_dir,
                 # log_y=os.getenv("LOG_Y", "True").lower() == "true",
                 log_y=False,
-                plot_cnt=self.plot_cnt // 2,
+                plot_cnt=self.plot_cnt,
             )
             plot_all_ugw_n_iv_curve_colormap(
                 ugw_n_values=self.ugw_n_values,
                 plot_data=self.plot_data,
                 plot_dir=self.plot_dir,
                 log_y=True,
-                plot_cnt=self.plot_cnt // 2,
+                plot_cnt=self.plot_cnt,
             )
         ### New
         # vto = episode.custom_data["Vto"]
