@@ -170,7 +170,7 @@ def plot_all_ugw_n_iv_curve_colormap(
     for i, ugw_n in enumerate(ugw_n_values):
         label_target = "Target" if i == len(ugw_n_values) - 1 else None
         # label_initial = "Initial" if i == len(ugw_n_values) - 1 else None
-        label_current = "PPO" if i == len(ugw_n_values) - 1 else None
+        label_current = "SAC" if i == len(ugw_n_values) - 1 else None
         # 1. Plot the target data (Measured) using the 'Blues' colormap.
         ax.plot(
             vgs,

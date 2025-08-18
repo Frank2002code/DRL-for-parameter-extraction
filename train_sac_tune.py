@@ -123,7 +123,7 @@ if __name__ == "__main__":
             critic_lr=args.critic_lr * num_learners,
             grad_clip=args.grad_clip,
             ### New
-            num_steps_sampled_before_learning_starts=min(
+            num_steps_sampled_before_learning_starts=max(
                 min_learning_starts, args.num_steps_sampled_before_learning_starts
             ),
         )
