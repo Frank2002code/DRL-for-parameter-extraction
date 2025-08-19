@@ -168,9 +168,9 @@ def plot_all_ugw_n_iv_curve_colormap(
 
     # === Iterate through each (Ugw, NOF) pair and plot with gradient colors ===
     for i, ugw_n in enumerate(ugw_n_values):
-        label_target = "Target" if i == len(ugw_n_values) - 1 else None
+        label_target = "Measured Data" if i == len(ugw_n_values) - 1 else None
         # label_initial = "Initial" if i == len(ugw_n_values) - 1 else None
-        label_current = "SAC" if i == len(ugw_n_values) - 1 else None
+        label_current = "EEHEMT Simulation" if i == len(ugw_n_values) - 1 else None
         # 1. Plot the target data (Measured) using the 'Blues' colormap.
         ax.plot(
             vgs,
@@ -241,6 +241,7 @@ class PlotCurve(DefaultCallbacks):
         ### New
         self.ugw_n_values = []  # Store lg values for plotting
         self.plot_cnt = 0
+        self.min_rmspe = 10.0
 
     def on_environment_created(
         self, *, env_runner, metrics_logger=None, env, env_context, **kwargs
@@ -333,37 +334,35 @@ class PlotCurve(DefaultCallbacks):
         self.plot_cnt += 1
         if "i_sim_current_matrix" in last_info:
             current_rmspe = last_info["current_rmspe"]
+            if current_rmspe < self.min_rmspe:
+                self.min_rmspe = current_rmspe
+
             i_sim_current_matrix = last_info["i_sim_current_matrix"]
             self.plot_data.update(i_sim_current_matrix)  # type: ignore
             # Return None
 
             print(
-                f"\nFinal RMSPE: {current_rmspe:.4f}\nStarting to plot {6 * len(self.ugw_n_values)} curves..."
+                f"\nFinal RMSPE: {current_rmspe:.5f}\nMin RMSPE: {self.min_rmspe:.5f}\nStarting to plot {6 * len(self.ugw_n_values)} curves..."
             )
 
-            plot_all_ugw_n_iv_curve_colormap(
-                ugw_n_values=self.ugw_n_values,
-                plot_data=self.plot_data,
-                plot_dir=self.plot_dir,
-                # log_y=os.getenv("LOG_Y", "True").lower() == "true",
-                log_y=False,
-                plot_cnt=self.plot_cnt,
-            )
-            plot_all_ugw_n_iv_curve_colormap(
-                ugw_n_values=self.ugw_n_values,
-                plot_data=self.plot_data,
-                plot_dir=self.plot_dir,
-                log_y=True,
-                plot_cnt=self.plot_cnt,
-            )
+            ### New
+            if self.plot_cnt % 5 == 0:
+                plot_all_ugw_n_iv_curve_colormap(
+                    ugw_n_values=self.ugw_n_values,
+                    plot_data=self.plot_data,
+                    plot_dir=self.plot_dir,
+                    # log_y=os.getenv("LOG_Y", "True").lower() == "true",
+                    log_y=False,
+                    plot_cnt=self.plot_cnt // 5,
+                )
+                plot_all_ugw_n_iv_curve_colormap(
+                    ugw_n_values=self.ugw_n_values,
+                    plot_data=self.plot_data,
+                    plot_dir=self.plot_dir,
+                    log_y=True,
+                    plot_cnt=self.plot_cnt // 5,
+                )
         ### New
-        # vto = episode.custom_data["Vto"]
-        # avg_vto = np.mean(vto) if vto else 0.0
-        # metrics_logger.log_value(
-        #     "avg_vto",
-        #     avg_vto,
-        #     reduce=None,
-        # )
         for param_name in tunable_params_names:
             param_values = episode.custom_data[param_name]
             
