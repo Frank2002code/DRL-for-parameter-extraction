@@ -168,9 +168,9 @@ def plot_all_ugw_n_iv_curve_colormap(
 
     # === Iterate through each (Ugw, NOF) pair and plot with gradient colors ===
     for i, ugw_n in enumerate(ugw_n_values):
-        label_target = "Measured Data" if i == len(ugw_n_values) - 1 else None
+        label_target = "Target" if i == len(ugw_n_values) - 1 else None
         # label_initial = "Initial" if i == len(ugw_n_values) - 1 else None
-        label_current = "EEHEMT Simulation" if i == len(ugw_n_values) - 1 else None
+        label_current = "PPO" if i == len(ugw_n_values) - 1 else None
         # 1. Plot the target data (Measured) using the 'Blues' colormap.
         ax.plot(
             vgs,
@@ -342,7 +342,7 @@ class PlotCurve(DefaultCallbacks):
             # Return None
 
             print(
-                f"\nFinal RMSPE: {current_rmspe:.5f}\nMin RMSPE: {self.min_rmspe:.5f}\nStarting to plot {6 * len(self.ugw_n_values)} curves..."
+                f"\nFinal RMSPE: {current_rmspe:.5f}\nMin RMSPE: {self.min_rmspe:.5f}\nStarting to plot {4* len(self.ugw_n_values)} curves..."
             )
 
             ### New

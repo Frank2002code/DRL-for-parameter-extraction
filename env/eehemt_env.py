@@ -11,18 +11,18 @@ from dotenv import load_dotenv
 from gymnasium.spaces import Box
 
 from utils.dim_reduce import get_err_features
-from utils.metrics import calculate_rmspe
+from utils.metrics import calculate_rmspe, calculate_rmse
 
 load_dotenv()
 # Dictionary of all possible tunable parameters
 ALL_POSSIBLE_TUNABLE_PARAMS = {
     ## === 臨界電壓相關 ===
     # Vto 預設值: 0.258 。範圍設定涵蓋增強型(E-mode)與空乏型(D-mode)HEMT。
-    "Vto": {"min": -1.0, "max": 1.5, "factor": 0.01, "init": -0.201},
+    "Vto": {"min": -1.0, "max": 1.5, "factor": 0.01, "init": 0.335},
     # Vtso 預設值: 0.358 。為飽和區的臨界電壓參數。
     # "Vtso": {"min": 0.0, "max": 1.5, "factor": 0.01},
     # Vgo 預設值: 0.618 。為跨導模型中的閘極電壓參數。
-    "Vgo": {"min": 0.0, "max": 1.5, "factor": 0.01, "init": 0.513},
+    "Vgo": {"min": 0.0, "max": 1.5, "factor": 0.01, "init": 0.521},
     # Vco 預設值: 0.75 。為輸出電導模型中的交叉電壓。
     # "Vco": {"min": 0.0, "max": 2.0, "factor": 0.01},
     # Vch 預設值: 1.4 。此為影響臨界電壓的參數之一。
@@ -31,27 +31,27 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     # "Gamma": {"min": 0.0, "max": 0.3, "factor": 0.001},
     ## === 跨導與電流增益 ===
     # Gmmax 預設值: 0.168 。範圍涵蓋了典型的RF/功率元件。
-    "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.002, "init": 0.248},
+    "Gmmax": {"min": 0.05, "max": 0.5, "factor": 0.002, "init": 0.185},
     # Deltgm 預設值: 0.252 。此為跨導的修正因子。
     # "Deltgm": {"min": 0.0, "max": 1.0, "factor": 0.01},
     ## === 飽和區效應 ===
     # Vsat 預設值: 0.57 。決定I-V曲線膝點(knee)電壓，通常在1V上下。
-    "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.01, "init": 0.979},
+    "Vsat": {"min": 0.1, "max": 2.0, "factor": 0.01, "init": 0.356},
     # Kapa 預設值: 0.069 。功能同通道長度調變 Lambda，值通常較小。
-    "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.001, "init": 0.276},
+    "Kapa": {"min": 0.0, "max": 0.3, "factor": 0.001, "init": 0.059},
     # Peff 預設值: 1.53 。與自熱效應相關，範圍可較大。
-    "Peff": {"min": 0.5, "max": 10.0, "factor": 0.05, "init": 2.641},
+    "Peff": {"min": 0.5, "max": 10.0, "factor": 0.05, "init": 1.815},
     # Vdso 預設值: 3.5 。DIBL效應的參考電壓，影響飽和區行為。
     # "Vdso": {"min": 1.0, "max": 10.0, "factor": 0.1},
     # Vba 預設值: 4.8 。與跨導飽和區的平滑度相關，對拐點形狀影響大。
     # "Vba": {"min": 0.5, "max": 10.0, "factor": 0.1},
     ## === 二階效應 ===
     # Alpha 預設值: 0.01 。作為轉態區的平滑化因子，通常為一小正數。
-    "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.001, "init": 0.005},
+    "Alpha": {"min": 0.001, "max": 0.2, "factor": 0.001, "init": 0.008},
     # Mu 預設值: 7.86e-6 。為遷移率退化係數。
     # "Mu": {"min": 1e-7, "max": 1e-4, "factor": 1e-7},
     # Vbc 預設值: 0.95 。為崩潰電壓相關參數。
-    "Vbc": {"min": 0.1, "max": 5.0, "factor": 0.05, "init": 1.790},
+    "Vbc": {"min": 0.1, "max": 5.0, "factor": 0.05, "init": 1.33},
     ## === 漏電流相關 (次臨界區) ===
     # Is 預設值: 5.7e-13 。閘極漏電流的飽和電流，影響次臨界區。
     # "Is": {"min": 1e-15, "max": 1e-9, "factor": 1e-15},
@@ -59,9 +59,9 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     # "N": {"min": 1.0, "max": 5.0, "factor": 0.05},
     ## === 寄生電阻 ===
     # Rs 預設值: 2.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rs": {"min": 0.1, "max": 10.0, "factor": 0.1, "init": 2.111},
+    "Rs": {"min": 0.1, "max": 10.0, "factor": 0.1, "init": 1.8},
     # Rd 預設值: 1.0 。範圍涵蓋小訊號到功率元件的典型值。
-    "Rd": {"min": 0.1, "max": 5.0, "factor": 0.1, "init": 1.568},
+    "Rd": {"min": 0.1, "max": 5.0, "factor": 0.1, "init": 1.21},
     # Ris 預設值: 0.3 。內部源極寄生電阻。
     # "Ris": {"min": 0.0, "max": 1.0, "factor": 0.01},
     # Rid 預設值: 0.001 。內部汲極寄生電阻。
@@ -2120,7 +2120,11 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
         reward = self.prev_rmspe - current_rmspe
         if self.reward_norm and abs(reward) < self.REWARD_NORM_THRESHOLD:
             reward = (self.prev_rmspe - current_rmspe) / (self.prev_rmspe + EPSILON)
-            reward = np.clip(reward, -5, 5)  # Normalize reward to [-1, 1]
+        # reward = np.clip(reward, -100, 100)  # Normalize reward to [-1, 1]
+        # prev_log_rmspe = np.log(self.prev_rmspe + EPSILON)
+        # current_log_rmspe = np.log(current_rmspe + EPSILON)
+
+        # reward = prev_log_rmspe - current_log_rmspe
         self.prev_rmspe = current_rmspe
 
         # === Get the next observation and info ===

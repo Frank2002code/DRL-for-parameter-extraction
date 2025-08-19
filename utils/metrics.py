@@ -9,3 +9,11 @@ def calculate_rmspe(y_true: np.ndarray, y_pred: np.ndarray) -> float:
     y_true_safe = np.where(np.abs(y_true) < 1e-12, 1e-12, y_true)
     rmspe = np.sqrt(np.mean(np.square((y_true - y_pred) / y_true_safe)))
     return rmspe
+
+def calculate_rmse(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """
+    Calculates the Root Mean Square Error (RMSE).
+    RMSE = sqrt(mean((y_true - y_pred)^2))
+    """    
+    rmse = np.sqrt(np.mean(np.square(y_true - y_pred)))
+    return rmse
