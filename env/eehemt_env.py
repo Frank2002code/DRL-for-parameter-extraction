@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 from gymnasium.spaces import Box
 
 from utils.dim_reduce import get_err_features
-from utils.metrics import calculate_rmspe, calculate_rmse
+from utils.metrics import calculate_rmspe, calculate_nrmse
 
 load_dotenv()
 # Dictionary of all possible tunable parameters
@@ -1985,7 +1985,10 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
         """Inverse transform function: converts normalized action [-1, 1] to actual parameter changes."""
         return action * self.ACTION_FACTORS
 
-    def _run_all_ugw_n_sim(self) -> tuple[np.ndarray, np.ndarray]:
+    def _run_all_ugw_n_sim(
+        self,
+        use_nrmse: bool = True,
+    ) -> tuple[np.ndarray, np.ndarray]:
         """
         NEW: Helper function to run simulations for all Ugw and NOF conditions.
 
@@ -2030,12 +2033,20 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
             i_sim_results.append(i_sim_single_curve)
         all_i_sim_matrix = np.array(i_sim_results)
 
-        all_err_matrix = (
-            all_i_meas_matrix - all_i_sim_matrix
-        )  # self.i_meas - all_i_sim_matrix
-
-        concat_err_vector = all_err_matrix.flatten().astype(np.float32)
-
+        if use_nrmse:
+            concat_err_vector = np.array(
+            [
+                calculate_nrmse(i_meas_row, i_sim_row)
+                for i_meas_row, i_sim_row in zip(all_i_meas_matrix, all_i_sim_matrix)
+                ],
+                dtype=np.float32,
+            )
+        else:
+            all_err_matrix = (
+                all_i_meas_matrix - all_i_sim_matrix
+            )
+            concat_err_vector = all_err_matrix.flatten().astype(np.float32)
+            
         # Calculate RMSPE for each I-V curve (each row).
         rmspe_vals = np.array(
             [
