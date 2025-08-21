@@ -1840,7 +1840,7 @@ class EEHEMTEnv_Norm_Ugw_N(gym.Env):
                     f"Measured data file not found:: {self.csv_file_path}"
                 )
             measured_data = pd.read_csv(self.csv_file_path)
-            self.vgs = measured_data["vg"].values  # type: ignore
+            self.vgs = measured_data["Vgs"].values  # type: ignore
         vds = np.full_like(self.vgs, VDS)
         self.sweep_bias = {
             "br_gisi": self.vgs,
