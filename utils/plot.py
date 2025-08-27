@@ -4,9 +4,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from dotenv import load_dotenv
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
-from env.eehemt_env import tunable_params_names, CHANGE_PARAM_NAMES
+
+from env.eehemt_env import CHANGE_PARAM_NAMES, tunable_params_names
 
 load_dotenv()
+### New
+PLOT_PERIOD = int(os.getenv("PLOT_PERIOD", 5))
+
 
 def plot_iv_curve(
     plot_data: dict,
@@ -133,7 +137,6 @@ def plot_all_lg_iv_curve(
     print(f"==== I-V curve plot saved in {save_path} ====")
 
 
-### New
 def plot_all_ugw_n_iv_curve_colormap(
     ugw_n_values: list,
     plot_data: dict,
@@ -150,6 +153,7 @@ def plot_all_ugw_n_iv_curve_colormap(
         plot_data (dict): A dictionary containing static plotting data.
         plot_dir (str): The directory path to save the plots.
     """
+    # print(f"i_sim_current_matrix shape: {plot_data['i_sim_current_matrix'].shape}")
     # === Get static data from plot_data ===
     vgs = plot_data["vgs"]
     i_meas_dict = plot_data["i_meas_dict"]
@@ -204,13 +208,13 @@ def plot_all_ugw_n_iv_curve_colormap(
     ax.set_title(f"I-V Curve Comparison for All {', '.join(CHANGE_PARAM_NAMES)} Values")
     ax.set_xlabel("Gate Voltage (Vg) [V]")
     if log_y:
-        ax.set_ylabel("Log Drain Current (Id) [A]")
+        ax.set_ylabel("Log Drain Current (Id) [mA]")
         ax.set_yscale("log")
         save_path = os.path.join(
             plot_dir, f"iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_log_{plot_cnt}.png"
         )
     else:
-        ax.set_ylabel("Drain Current (Id) [A]")
+        ax.set_ylabel("Drain Current (Id) [mA]")
         save_path = os.path.join(
             plot_dir, f"iv_curve_all_{'_'.join(CHANGE_PARAM_NAMES)}_{plot_cnt}.png"
         )
@@ -241,12 +245,14 @@ class PlotCurve(DefaultCallbacks):
         ### New
         self.ugw_n_values = []  # Store lg values for plotting
         self.plot_cnt = 0
-        self.min_rmspe = 10.0
+        self.min_nrmse = 100.0
 
     def on_environment_created(
         self, *, env_runner, metrics_logger=None, env, env_context, **kwargs
     ):
-        actual_env = env.envs[0].unwrapped  # type(actual_env).__name__ = EEHEMTEnv_Norm_Lgs
+        actual_env = env.envs[
+            0
+        ].unwrapped  # type(actual_env).__name__ = EEHEMTEnv_Norm_Lgs
 
         if self.plot_data is None:
             print("\nFetching static plot data from the environment...\n")
@@ -258,27 +264,6 @@ class PlotCurve(DefaultCallbacks):
                 print("Warning: Environment does not have '_get_plot_data' method.")
                 self.plot_data = {}
                 return
-
-    def on_evaluate_end(
-        self, *, algorithm, metrics_logger=None, evaluation_metrics, **kwargs
-    ):
-        # algorithm: PPO(env=<class 'env.eehemt_env.EEHEMTEnv_Norm_Lgs'>; env-runners=10; learners=4; multi-agent=False)
-        # metrics_logger: <ray.rllib.utils.metrics.metrics_logger.MetricsLogger object at 0x7f4080566350>
-        # evaluation_metrics: {'env_runners': {'module_to_env_connector': {'timers': {'connectors': {'listify_data_for_vector_env': 3.677929740308673e-05,
-        # 'remove_single_ts_time_rank_from_batch': 2.2118753837598408e-06, 'get_actions': 7.603191273219271e-05, 'tensor_to_numpy': 6.033979039501661e-05,
-        # 'un_batch_to_individual_items': 2.0221763372970588e-05, 'normalize_and_clip_actions': 6.799664383943636e-05}}, 'connector_pipeline_timer': 0.0003552631200052729},
-        # 'env_to_module_connector': {'timers': {'connectors': {'add_states_from_episodes_to_batch': 4.732462731121214e-06, 'batch_individual_items': 2.2336920543336885e-05,
-        # 'add_observations_from_episodes_to_batch': 9.787067230587847e-06, 'add_time_dim_to_batch_and_zero_pad': 9.152046474831904e-06, 'numpy_to_tensor': 5.582577872646182e-05}},
-        # 'connector_pipeline_timer': 0.00016570912673812504}, 'agent_episode_return_mean': {'default_agent': -3608.688799738884},
-        # 'rlmodule_inference_timer': 0.00017641018404863687, 'num_agent_steps_sampled': {'default_agent': 1000},
-        # 'module_episode_return_mean': {'default_policy': -3608.688799738884}, 'num_module_steps_sampled_lifetime': {'default_policy': 1000},
-        # 'num_env_steps_sampled_lifetime': 1000, 'episode_return_min': -3608.688799738884, 'episode_len_mean': 1000.0, 'num_episodes_lifetime': 1,
-        # 'num_episodes': 1, 'num_env_steps_sampled': 1000, 'episode_duration_sec_mean': 2.0138601511716843, 'episode_len_max': 1000,
-        # 'episode_return_mean': -3608.688799738884, 'weights_seq_no': 1.0, 'num_agent_steps_sampled_lifetime': {'default_agent': 1000},
-        # 'env_to_module_sum_episodes_length_in': 901.0042739534927, 'episode_return_max': -3608.688799738884, 'num_module_steps_sampled': {'default_policy': 1000},
-        # 'episode_len_min': 1000, 'env_step_timer': 0.0011205974719583366, 'env_reset_timer': 0.001857757568359375,
-        # 'env_to_module_sum_episodes_length_out': 901.0042739534927, 'sample': 3.3040749318897724}}
-        pass
 
     ### New
     def on_episode_start(
@@ -333,43 +318,39 @@ class PlotCurve(DefaultCallbacks):
         last_info = episode.infos[-1]
         self.plot_cnt += 1
         if "i_sim_current_matrix" in last_info:
-            current_rmspe = last_info["current_rmspe"]
-            if current_rmspe < self.min_rmspe:
-                self.min_rmspe = current_rmspe
+            nrmse = last_info["nrmse"]
+            if nrmse < self.min_nrmse:
+                self.min_nrmse = nrmse
 
-            i_sim_current_matrix = last_info["i_sim_current_matrix"]
-            self.plot_data.update(i_sim_current_matrix)  # type: ignore
-            # Return None
+            self.plot_data["i_sim_current_matrix"] = last_info["i_sim_current_matrix"]
 
-            print(
-                f"\nFinal RMSPE: {current_rmspe:.5f}\nMin RMSPE: {self.min_rmspe:.5f}\nStarting to plot {4* len(self.ugw_n_values)} curves..."
-            )
+            print(f"\nFinal NRMSE: {nrmse:.5f}\nMin NRMSE: {self.min_nrmse:.5f}")
 
             ### New
-            if self.plot_cnt % 5 == 0:
+            if self.plot_cnt % PLOT_PERIOD == 0:
                 plot_all_ugw_n_iv_curve_colormap(
                     ugw_n_values=self.ugw_n_values,
                     plot_data=self.plot_data,
                     plot_dir=self.plot_dir,
                     # log_y=os.getenv("LOG_Y", "True").lower() == "true",
                     log_y=False,
-                    plot_cnt=self.plot_cnt // 5,
+                    plot_cnt=self.plot_cnt // PLOT_PERIOD,
                 )
                 plot_all_ugw_n_iv_curve_colormap(
                     ugw_n_values=self.ugw_n_values,
                     plot_data=self.plot_data,
                     plot_dir=self.plot_dir,
                     log_y=True,
-                    plot_cnt=self.plot_cnt // 5,
+                    plot_cnt=self.plot_cnt // PLOT_PERIOD,
                 )
         ### New
         for param_name in tunable_params_names:
             param_values = episode.custom_data[param_name]
-            
+
             avg_param_value = np.mean(param_values) if param_values else 0.0
-            
+
             log_key = f"avg_{param_name}"
-            
+
             metrics_logger.log_value(
                 log_key,
                 avg_param_value,

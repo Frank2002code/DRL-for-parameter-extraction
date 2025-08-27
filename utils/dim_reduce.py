@@ -14,8 +14,7 @@ def get_err_features(
     # max_current = 0.0
     # for curve in i_meas_dict.values():
     #     max_current = max(max_current, np.max(curve))
-    
-    
+
     len_single_curve = len(vgs)
     all_features = []
 
