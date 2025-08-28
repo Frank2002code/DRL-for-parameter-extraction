@@ -2269,7 +2269,7 @@ class EEHEMTEnv_Measure(gym.Env):
             self.ugw_n_values = [
                 (int(row["width"]), int(row["finger"]))
                 for _, row in ugw_n_combinations.iterrows()
-            ]
+            ][:2]
 
             self.vgs = filtered_df[
                 (filtered_df["width"] == self.ugw_n_values[0][0])
@@ -2380,7 +2380,7 @@ class EEHEMTEnv_Measure(gym.Env):
         if self.reduce_obs_err_dim:
             total_err_len = int(os.getenv("N_FEATURES_PER_CURVE", 6)) * self.num_ugw
         else:
-            total_err_len = self.num_ugw
+            total_err_len = len(self.vgs) * self.num_ugw
         err_vector_low = np.full(total_err_len, -np.inf)
         err_vector_high = np.full(total_err_len, np.inf)
 
@@ -2450,7 +2450,6 @@ class EEHEMTEnv_Measure(gym.Env):
             err_features = get_err_features(
                 self.vgs,
                 concat_err_vector,
-                # self.i_meas_dict,
                 self.current_params["Vto"],
                 self.current_params["Vgo"],
                 self.num_ugw,
@@ -2519,9 +2518,8 @@ class EEHEMTEnv_Measure(gym.Env):
                 i_sim_single_curve = np.nan_to_num(
                     i_sim_single_curve, nan=0.0, posinf=1e5, neginf=-1e5
                 )
-            i_sim_single_curve = normalize_i(i_sim_single_curve)
+            i_sim_single_curve = normalize_i(i_sim_single_curve, ugw_n)
 
-            
             i_sim_results.append(i_sim_single_curve)
         all_i_sim_matrix = np.array(i_sim_results)
 
@@ -2530,15 +2528,17 @@ class EEHEMTEnv_Measure(gym.Env):
             all_err_matrix = all_i_meas_matrix - all_i_sim_matrix
             concat_err_vector = all_err_matrix.flatten().astype(np.float32)
         else:
-            concat_err_vector = np.array(
-                [
-                    calculate_nrmse(i_meas_row, i_sim_row)
-                    for i_meas_row, i_sim_row in zip(
-                        all_i_meas_matrix, all_i_sim_matrix
-                    )
-                ],
-                dtype=np.float32,
-            )
+            # concat_err_vector = np.array(
+            #     [
+            #         calculate_nrmse(i_meas_row, i_sim_row)
+            #         for i_meas_row, i_sim_row in zip(
+            #             all_i_meas_matrix, all_i_sim_matrix
+            #         )
+            #     ],
+            #     dtype=np.float32,
+            # )
+            all_err_matrix = all_i_meas_matrix - all_i_sim_matrix
+            concat_err_vector = all_err_matrix.flatten().astype(np.float32)
 
         # Calculate RMSPE for each I-V curve (each row).
         # rmspe_vals = np.array(
@@ -2673,7 +2673,7 @@ class EEHEMTEnv_Measure(gym.Env):
         ### New
         current_nrmse = np.mean(nrmse_vals)
         ### New
-        raw_reward = (self.prev_nrmse - current_nrmse) / (self.prev_nrmse + EPSILON)
+        raw_reward = self.prev_nrmse - current_nrmse
         # if self.reward_norm and abs(reward) < self.REWARD_NORM_THRESHOLD:
         #     reward = (self.prev_nrmse - current_nrmse) / (self.prev_nrmse + EPSILON)
         reward = self._normalize_reward(raw_reward)
