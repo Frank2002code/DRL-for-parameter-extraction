@@ -4,7 +4,7 @@
 
 `include "disciplines.vams"
 `include "constants.vams"
-`include "compact.vams"
+// `include "compact.vams"
 
 `define max_arg 40
 	
@@ -101,17 +101,17 @@ module eehemt114_va_model (d, g, s);
 	real Cgp=5.87502E-14;// scalable eq
 	parameter real Cdp=12e-15;
 
-	parameter real Vg_mean=6.000000e-01;
-	parameter real Vg_std =0.353555;
-	parameter real Vd_mean=2.750000;
-	parameter real Vd_std =1.53;    
-	parameter real Inverse_weight=0.357248;
-	parameter real Inverse_bias=0.707048;
+	// parameter real Vg_mean=6.000000e-01;
+	// parameter real Vg_std =0.353555;
+	// parameter real Vd_mean=2.750000;
+	// parameter real Vd_std =1.53;    
+	// parameter real Inverse_weight=0.357248;
+	// parameter real Inverse_bias=0.707048;
 
-    real X[1:6];   // Array to store X11 to X16 values (Layer 1)
-    real X2[1:5];  // Array to store X21 to X25 values (Layer 2)
-    real X3[1:4];  // Array to store X31 to X34 values (Layer 3)
-    real Alpha1;   // To store the final Alpha1 value
+    // real X[1:6];   // Array to store X11 to X16 values (Layer 1)
+    // real X2[1:5];  // Array to store X21 to X25 values (Layer 2)
+    // real X3[1:4];  // Array to store X31 to X34 values (Layer 3)
+    // real Alpha1;   // To store the final Alpha1 value
     integer i,j;
     	
         inout d, g, s;
@@ -127,7 +127,7 @@ module eehemt114_va_model (d, g, s);
 	real Vgs_ac,Vts_ac,Vt_ac,Vg_ac,Vx_ac,Idso_ac1,gmo_ac1,arg_ac,Idso_ac;
 	real Vcac,Vbac,Vaac,gmoff_ac,a_ac,b_ac,svb_ac,Idsv_All_ac;
 	real I_ds_ac,Pdiss_ac,Ids_ac,Idbp,Idb;
-	real Igs,Igd,Ids;
+	(*retrieve*) real Igs,Igd,Ids;
 	real Is_N,Is_N2,Idsdelay,Idbdelay;
 	real f1,f2,Vj,Vo,Vgc,Vgy,gV,qg,qgc,qgy;
 	real chargeconst,boltzmannconst;
@@ -150,7 +150,7 @@ module eehemt114_va_model (d, g, s);
 
        //V(g,s),V(d,s),Ids1   
        //input Vgs2,Vds2,Ids;
-       //real Vgs2,Vds2,Ids;
+    //    real Vgs2,Vds2,Ids;
        
        //real X11,X12,X13,X14,X15,X21,X22,X23,X24,X31,X32,X33,X16,X25,X34;
 
@@ -331,47 +331,48 @@ module eehemt114_va_model (d, g, s);
 	//$debug("Idso,Idsv_All = %e %e",Idso,Idsv_All);
 	Pdiss=I_ds*Vds;
         //IdsANN=Alpha1(Vgs2,Vds2,Ids);
-        Ids1=I_ds/(1+Pdiss/Peff_N);
-			    Vggg=(V(g,s)-Vg_mean)/Vg_std;
-        Id=0.005657*Ids1*2500 -1.066087;
-        Vd=(V(d,s)-Vd_mean)/Vd_std;
+        // Ids1=I_ds/(1+Pdiss/Peff_N);
+		Ids=I_ds/(1+Pdiss/Peff_N);
+		// 	    Vggg=(V(g,s)-Vg_mean)/Vg_std;
+        // Id=0.005657*Ids1*2500 -1.066087;
+        // Vd=(V(d,s)-Vd_mean)/Vd_std;
        
 		// For loop to compute X11 to X16 (Layer 1)
-		for (i = 1; i <= 6; i = i + 1) begin
-			X[i] = $table_model(1, i, 1, "sample1.dat") * Vggg
-				+ $table_model(1, i, 2, "sample1.dat") * Id
-				+ $table_model(1, i, 3, "sample1.dat") * Vd
-				+ $table_model(1, i, 1, "sample2.dat");
-			X[i] = max(0, X[i]);
-		end
+		// for (i = 1; i <= 6; i = i + 1) begin
+		// 	X[i] = $table_model(1, i, 1, "sample1.dat") * Vggg
+		// 		+ $table_model(1, i, 2, "sample1.dat") * Id
+		// 		+ $table_model(1, i, 3, "sample1.dat") * Vd
+		// 		+ $table_model(1, i, 1, "sample2.dat");
+		// 	X[i] = max(0, X[i]);
+		// end
 		
 			// For loop to compute X21 to X25 (Layer 2)
-		for (i = 1; i <= 5; i = i + 1) begin
-                             X2[i] = 0;
-		    for (j = 1; j <= 6; j = j + 1) begin
-				X2[i] = X2[i] + $table_model(2, i, j, "sample1.dat") * X[j];end
-			X2[i] = X2[i] + $table_model(2, i, 1, "sample2.dat");
-			X2[i] = max(0, X2[i]);
-		end
+		// for (i = 1; i <= 5; i = i + 1) begin
+        //                      X2[i] = 0;
+		//     for (j = 1; j <= 6; j = j + 1) begin
+		// 		X2[i] = X2[i] + $table_model(2, i, j, "sample1.dat") * X[j];end
+		// 	X2[i] = X2[i] + $table_model(2, i, 1, "sample2.dat");
+		// 	X2[i] = max(0, X2[i]);
+		// end
 		
 		// For loop to compute X31 to X34 (Layer 3)
-		for (i = 1; i <= 4; i = i + 1) begin
-                                X3[i] = 0;
-		    for (j = 1; j <= 5; j = j + 1) begin		
-				X3[i] = X3[i] +  $table_model(3, i, j, "sample1.dat") * X2[j];end
-			X3[i] = X3[i] + $table_model(3, i, 1, "sample2.dat");
-			X3[i] = max(0, X3[i]);
-		end
+		// for (i = 1; i <= 4; i = i + 1) begin
+        //                         X3[i] = 0;
+		//     for (j = 1; j <= 5; j = j + 1) begin		
+		// 		X3[i] = X3[i] +  $table_model(3, i, j, "sample1.dat") * X2[j];end
+		// 	X3[i] = X3[i] + $table_model(3, i, 1, "sample2.dat");
+		// 	X3[i] = max(0, X3[i]);
+		// end
 		
 		// Compute Alpha1 using results from Layer 3
-		Alpha1 = ( $table_model(4, 1, 1, "sample1.dat") * X3[1]
-				+ $table_model(4, 1, 2, "sample1.dat") * X3[2]
-				+ $table_model(4, 1, 3, "sample1.dat") * X3[3]
-				+ $table_model(4, 1, 4, "sample1.dat") * X3[4]
-				+ $table_model(4, 1, 1, "sample2.dat") )
-				* Inverse_weight + Inverse_bias;
+		// Alpha1 = ( $table_model(4, 1, 1, "sample1.dat") * X3[1]
+		// 		+ $table_model(4, 1, 2, "sample1.dat") * X3[2]
+		// 		+ $table_model(4, 1, 3, "sample1.dat") * X3[3]
+		// 		+ $table_model(4, 1, 4, "sample1.dat") * X3[4]
+		// 		+ $table_model(4, 1, 1, "sample2.dat") )
+		// 		* Inverse_weight + Inverse_bias;
 	//$debug("Alpha1 = %e ",X[1]);		
-        Ids=Ids1*Alpha1;
+        // Ids=Ids1*Alpha1;
 	//$debug("Ids,I_ds,Pdiss = %e %e %e",Ids,I_ds,Pdiss);
 	Vts_ac=(Vtsoac_N-Vch)/(1+Gammaac_N*(Vdso-Vds))+Vch;
 	if (Vgs1<Vts_ac && Vtsoac_N>Vtoac_N)

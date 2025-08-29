@@ -72,12 +72,14 @@ if __name__ == "__main__":
     )  # The mean reward to stop training
 
     # === Learner arguments ===
-    if th.cuda.device_count() == 4:
-        num_learners = 4
-        num_gpus_per_learner = 1.0
-    elif th.cuda.device_count() == 2:
-        num_learners = 2
-        num_gpus_per_learner = 1.0
+    # if th.cuda.device_count() == 4:
+    #     num_learners = 4
+    #     num_gpus_per_learner = 1.0
+    # elif th.cuda.device_count() == 2:
+    #     num_learners = 2
+    #     num_gpus_per_learner = 1.0
+    num_learners = th.cuda.device_count() // 2
+    num_gpus_per_learner = 1.0
 
     # === Evaluation arguments ===
     # parser.add_argument("--log_y", action="store_true")

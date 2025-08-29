@@ -12,12 +12,14 @@ __pycache__/
 .augment/
 
 # Test 文件
-test/
+test/*
+!test/test_measure.ipynb
+!test/eehemt_test.ipynb
 
 # Result Dir
 result/*
-!result/iv_curve/
-result/iv_curve/*
-!result/iv_curve/08-15-*
+# !result/iv_curve/
+# result/iv_curve/*
+# !result/iv_curve/08-15-*
 
-.env
+# .env

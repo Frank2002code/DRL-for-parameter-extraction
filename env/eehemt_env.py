@@ -67,6 +67,7 @@ ALL_POSSIBLE_TUNABLE_PARAMS = {
     "Ris": {"min": 0.0, "max": 1.0, "factor": 0.01},
     # Rid 預設值: 0.001 。內部汲極寄生電阻。
     "Rid": {"min": 0.0, "max": 0.1, "factor": 0.001},
+    "Au": {"min": 0.05, "max": 0.35, "factor": 0.01},
 }
 
 # Get tunable params name from environment variable
@@ -2269,7 +2270,7 @@ class EEHEMTEnv_Measure(gym.Env):
             self.ugw_n_values = [
                 (int(row["width"]), int(row["finger"]))
                 for _, row in ugw_n_combinations.iterrows()
-            ][:2]
+            ]  # [:2]
 
             self.vgs = filtered_df[
                 (filtered_df["width"] == self.ugw_n_values[0][0])
@@ -2307,7 +2308,6 @@ class EEHEMTEnv_Measure(gym.Env):
             [config["max"] for config in tunable_params_config.values()],
             dtype=np.float32,
         )
-
 
         # === Load I_meas (y_true) and sweep bias ===
         vds_arr = np.full_like(self.vgs, vds)
@@ -2488,15 +2488,14 @@ class EEHEMTEnv_Measure(gym.Env):
 
     def _run_all_ugw_n_sim(
         self,
-        # use_nrmse: bool = True,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         """
-        NEW: Helper function to run simulations for all Ugw and NOF conditions.
+        Helper function to run simulations for all finger and width conditions.
 
         Returns:
-            tuple[np.ndarray, np.ndarray]:
+            tuple[np.ndarray, np.ndarray, np.ndarray]:
                 - A flattened numpy array containing all concatenated error vectors.
-                - A numpy array of RMSPE values for each (Ugw, NOF) condition.
+                - A numpy array of NRMSE values for each (Ugw, NOF) condition.
         """
         all_i_meas_matrix = np.array(
             [self.i_meas_dict[ugw_n] for ugw_n in self.ugw_n_values]
