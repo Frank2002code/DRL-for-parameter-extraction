@@ -100,7 +100,7 @@ if __name__ == "__main__":
     config = (
         PPOConfig()
         .environment(
-            EEHEMTEnv_Measure,
+            env=EEHEMTEnv_Measure,
             env_config={
                 "va_file_path": args.va_file_path,
                 # "tunable_params_config": tunable_params_config,
