@@ -2585,18 +2585,25 @@ class EEHEMTEnv_Measure(gym.Env):
         Returns:
             float: Normalized reward.
         """
+        
         if not self.reward_norm:
             return raw_reward
-        
-        # Update running statistics
-        self._update_reward_running_stats(raw_reward)
-        
-        # Normalize reward
-        running_std = np.sqrt(self.reward_running_var) + EPSILON
-        normalized_reward = (raw_reward - self.reward_running_mean) / running_std
+        elif abs(raw_reward) > self.REWARD_NORM_THRESHOLD:
+            # Update running statistics
+            self._update_reward_running_stats(raw_reward)
+            return raw_reward
+        else:
+            # Update running statistics
+            self._update_reward_running_stats(raw_reward)
+            
+            # Normalize reward
+            running_std = np.sqrt(self.reward_running_var) + EPSILON
+            normalized_reward = (raw_reward - self.reward_running_mean) / running_std
+            
+            return normalized_reward
         
         # Optional: clip normalized reward to reasonable range
-        return np.clip(normalized_reward, -5.0, 5.0)
+        # return np.clip(normalized_reward, -5.0, 5.0)
 
     def reset(self, seed: int | None = None, options: dict | None = None) -> tuple:
         """
