@@ -7,7 +7,7 @@ from ray import tune
 from ray.air.integrations.wandb import WandbLoggerCallback
 from ray.rllib.algorithms.ppo import PPOConfig
 
-from env.eehemt_env import EEHEMTEnv_Measure
+from env.eehemt_env import EEHEMTEnv_Measure_VDS
 
 # from utils.callbacks import CustomEvalCallbacks
 from utils.plot import PlotCurve
@@ -100,7 +100,7 @@ if __name__ == "__main__":
     config = (
         PPOConfig()
         .environment(
-            env=EEHEMTEnv_Measure,
+            env=EEHEMTEnv_Measure_VDS,
             env_config={
                 "va_file_path": args.va_file_path,
                 # "tunable_params_config": tunable_params_config,

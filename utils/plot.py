@@ -5,7 +5,7 @@ import numpy as np
 from dotenv import load_dotenv
 from ray.rllib.algorithms.callbacks import DefaultCallbacks
 
-from env.eehemt_env import CHANGE_PARAM_NAMES, tunable_params_names
+from env.eehemt_env import CHANGE_PARAM_NAMES, key_params_names
 
 load_dotenv()
 ### New
@@ -128,7 +128,7 @@ def plot_all_lg_iv_curve(
     plt.yscale("log")
     plt.grid(True, which="both", ls="--", alpha=0.7)
     plt.legend(bbox_to_anchor=(1.05, 1), loc="upper left", fontsize="small")
-    plt.tight_layout(rect=[0, 0, 0.85, 1])
+    plt.tight_layout(rect=[0, 0, 0.85, 1])  # type: ignore
     # Save the plot
     save_path = os.path.join(plot_dir, "final_iv_curve_all_lg.png")
     plt.savefig(save_path, dpi=300)
@@ -243,14 +243,15 @@ class PlotCurve(DefaultCallbacks):
             os.makedirs(self.plot_dir, exist_ok=True)
         self.plot_data = None
         ### New
-        self.ugw_n_values = []  # Store lg values for plotting
+        self.ugw_n_values = None  # Store lg values for plotting
+        self.vds_values = None
         self.plot_cnt = 0
         self.min_nrmse = 100.0
 
     def on_environment_created(
         self, *, env_runner, metrics_logger=None, env, env_context, **kwargs
     ):
-        actual_env = env.envs[
+        actual_env = env.envs[  # type: ignore
             0
         ].unwrapped  # type(actual_env).__name__ = EEHEMTEnv_Norm_Lgs
 
@@ -259,7 +260,10 @@ class PlotCurve(DefaultCallbacks):
             if hasattr(actual_env, "_get_plot_data_matrix"):
                 # Fetch static plot data only once
                 self.plot_data = actual_env._get_plot_data_matrix()
-                self.ugw_n_values = actual_env.ugw_n_values
+                if hasattr(actual_env, "ugw_n_values"):
+                    self.ugw_n_values = actual_env.ugw_n_values
+                if hasattr(actual_env, "vds_values"):
+                    self.vds_values = actual_env.vds_values
             else:
                 print("Warning: Environment does not have '_get_plot_data' method.")
                 self.plot_data = {}
@@ -281,8 +285,8 @@ class PlotCurve(DefaultCallbacks):
         **kwargs,
     ):
         # episode.custom_data["Vto"] = []
-        tunable_params = {name: [] for name in tunable_params_names}
-        episode.custom_data.update(tunable_params)
+        tunable_params = {name: [] for name in key_params_names}
+        episode.custom_data.update(tunable_params)  # type: ignore
 
     def on_episode_step(
         self,
@@ -298,11 +302,11 @@ class PlotCurve(DefaultCallbacks):
         policies=None,
         **kwargs,
     ):
-        current_params = env.envs[0].unwrapped.current_params
+        current_params = env.envs[0].unwrapped.current_params  # type: ignore
         # print(f"current_params: {current_params}")
         # episode.custom_data["Vto"].append(current_params["Vto"])
-        for param_name in tunable_params_names:
-            episode.custom_data[param_name].append(current_params[param_name])
+        for param_name in key_params_names:
+            episode.custom_data[param_name].append(current_params[param_name])  # type: ignore
 
     def on_episode_end(
         self,
@@ -322,29 +326,46 @@ class PlotCurve(DefaultCallbacks):
             if nrmse < self.min_nrmse:
                 self.min_nrmse = nrmse
 
-            self.plot_data["i_sim_current_matrix"] = last_info["i_sim_current_matrix"]
+            self.plot_data["i_sim_current_matrix"] = last_info["i_sim_current_matrix"]  # type: ignore
 
             print(f"\nFinal NRMSE: {nrmse:.5f}\nMin NRMSE: {self.min_nrmse:.5f}")
 
             ### New
             if self.plot_cnt % PLOT_PERIOD == 0:
-                plot_all_ugw_n_iv_curve_colormap(
-                    ugw_n_values=self.ugw_n_values,
-                    plot_data=self.plot_data,
-                    plot_dir=self.plot_dir,
-                    # log_y=os.getenv("LOG_Y", "True").lower() == "true",
-                    log_y=False,
-                    plot_cnt=self.plot_cnt // PLOT_PERIOD,
-                )
-                plot_all_ugw_n_iv_curve_colormap(
-                    ugw_n_values=self.ugw_n_values,
-                    plot_data=self.plot_data,
-                    plot_dir=self.plot_dir,
-                    log_y=True,
-                    plot_cnt=self.plot_cnt // PLOT_PERIOD,
-                )
+                if self.ugw_n_values is not None:
+                    plot_all_ugw_n_iv_curve_colormap(
+                        ugw_n_values=self.ugw_n_values,
+                        plot_data=self.plot_data,  # type: ignore
+                        plot_dir=self.plot_dir,
+                        # log_y=os.getenv("LOG_Y", "True").lower() == "true",
+                        log_y=False,
+                        plot_cnt=self.plot_cnt // PLOT_PERIOD,
+                    )
+                    plot_all_ugw_n_iv_curve_colormap(
+                        ugw_n_values=self.ugw_n_values,
+                        plot_data=self.plot_data,  # type: ignore
+                        plot_dir=self.plot_dir,
+                        log_y=True,
+                        plot_cnt=self.plot_cnt // PLOT_PERIOD,
+                    )
+                elif self.vds_values is not None:
+                    plot_all_ugw_n_iv_curve_colormap(
+                        ugw_n_values=self.vds_values,
+                        plot_data=self.plot_data,  # type: ignore
+                        plot_dir=self.plot_dir,
+                        # log_y=os.getenv("LOG_Y", "True").lower() == "true",
+                        log_y=False,
+                        plot_cnt=self.plot_cnt // PLOT_PERIOD,
+                    )
+                    plot_all_ugw_n_iv_curve_colormap(
+                        ugw_n_values=self.vds_values,
+                        plot_data=self.plot_data,  # type: ignore
+                        plot_dir=self.plot_dir,
+                        log_y=True,
+                        plot_cnt=self.plot_cnt // PLOT_PERIOD,
+                    )
         ### New
-        for param_name in tunable_params_names:
+        for param_name in key_params_names:
             param_values = episode.custom_data[param_name]
 
             avg_param_value = np.mean(param_values) if param_values else 0.0
